@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const html = await readFile(new URL("../public/3.html", import.meta.url), "utf8");
+const html = await readFile(new URL("../public/heishenhuawukong.html", import.meta.url), "utf8");
 const teacher = await readFile(new URL("../public/teacher.html", import.meta.url), "utf8");
 const login = await readFile(new URL("../public/login.html", import.meta.url), "utf8");
 const required = [
@@ -9,8 +9,10 @@ const required = [
   "INTERACT · AI角色互动",
   "COMPARE · 跨文化协商",
   "EXPLAIN · 讲好中国故事／初次产出",
-  "国际文化旅行者",
-  "西游行者",
+  "天命人",
+  "三钟入寺",
+  "金池长老",
+  "黑熊精",
   "引导表达",
   "自主协商",
   "批判探究",
@@ -22,8 +24,10 @@ const required = [
   "访谈线索",
   "GAI整理的“中国故事卡”",
   "/api/chat",
-  "black-myth-official-1.jpg",
-  "black-myth-shrine-gameplay.jpg",
+  "black-myth-ancient-guanyin-bell.jpg",
+  "black-myth-elder-jinchi.jpg",
+  "black-myth-black-bear-guai.jpg",
+  "按住圆点说话",
 ];
 const missing = required.filter((item) => !html.includes(item));
 if (missing.length) {

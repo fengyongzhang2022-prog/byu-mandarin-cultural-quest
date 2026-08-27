@@ -10,9 +10,8 @@ export async function middleware(request) {
     login.searchParams.set("next", path);
     return NextResponse.redirect(login);
   }
-  if (path === "/teacher.html" && session.role !== "teacher") return NextResponse.redirect(new URL("/3.html", request.url));
+  if (path === "/teacher.html" && session.role !== "teacher") return NextResponse.redirect(new URL("/heishenhuawukong.html", request.url));
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/3.html", "/teacher.html", "/api/chat/:path*"] };
-
+export const config = { matcher: ["/3.html", "/heishenhuawukong.html", "/teacher.html", "/api/chat/:path*"] };
