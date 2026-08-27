@@ -4,13 +4,26 @@ const html = await readFile(new URL("../public/3.html", import.meta.url), "utf8"
 const teacher = await readFile(new URL("../public/teacher.html", import.meta.url), "utf8");
 const login = await readFile(new URL("../public/login.html", import.meta.url), "utf8");
 const required = [
-  "进入故事",
-  "发现文化",
-  "AI角色互动",
-  "跨文化协商",
-  "讲好中国故事",
+  "ENTER · 进入故事／角色扮演",
+  "DISCOVER · 发现文化／文化探究",
+  "INTERACT · AI角色互动",
+  "COMPARE · 跨文化协商",
+  "EXPLAIN · 讲好中国故事／初次产出",
+  "国际文化旅行者",
+  "西游行者",
+  "引导表达",
+  "自主协商",
+  "批判探究",
+  "pre-quiz",
+  "recordPreAudio",
+  "建议至少1分钟，最长3分钟",
+  "post-quiz",
+  "学习日记",
+  "访谈线索",
+  "GAI整理的“中国故事卡”",
   "/api/chat",
-  "earth-shrine-hero.png",
+  "black-myth-official-1.jpg",
+  "black-myth-shrine-gameplay.jpg",
 ];
 const missing = required.filter((item) => !html.includes(item));
 if (missing.length) {
@@ -39,7 +52,7 @@ try {
   console.error(`Research dashboard script syntax error: ${error.message}`);
   process.exit(1);
 }
-for (const item of ["前测—后测记录", "导出前后测CSV", "人工编码"]) {
+for (const item of ["完整学习链路", "导出研究CSV", "人工编码", "支持方式", "GAI故事卡", "学习日记", "访谈线索"]) {
   if (!teacher.includes(item)) {
     console.error(`Missing research dashboard content: ${item}`);
     process.exit(1);
