@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.vercel/
+.playwright-cli/
+.env*
+!.env.example
+*.log
+outputs/
+work/
+docs/legacy-student-v1.html
