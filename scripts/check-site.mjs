@@ -4,30 +4,28 @@ const html = await readFile(new URL("../public/heishenhuawukong.html", import.me
 const teacher = await readFile(new URL("../public/teacher.html", import.meta.url), "utf8");
 const login = await readFile(new URL("../public/login.html", import.meta.url), "utf8");
 const required = [
-  "ENTER · 进入故事／角色扮演",
-  "DISCOVER · 发现文化／文化探究",
-  "INTERACT · AI角色互动",
+  "进入故事",
+  "PRE · 任务前文化解释",
+  "DISCOVER · 发现袈裟",
+  "INTERACT · 角色追问",
   "COMPARE · 跨文化协商",
-  "EXPLAIN · 讲好中国故事／初次产出",
-  "天命人",
-  "三钟入寺",
+  "EXPLAIN · 讲好这件衣服",
+  "EXTEND · 山外见闻",
+  "袈裟",
   "金池长老",
   "黑熊精",
-  "引导表达",
-  "自主协商",
-  "批判探究",
-  "pre-quiz",
-  "recordPreAudio",
-  "建议至少1分钟，最长3分钟",
-  "post-quiz",
-  "学习日记",
-  "访谈线索",
-  "GAI整理的“中国故事卡”",
+  "最长3分钟",
+  "录完可以回听和重说",
+  "给我一点提示",
+  "打开摄像头",
+  "重播角色的话",
+  "bmw_research_sessions_v4",
+  "kasayaQuestMedia",
   "/api/chat",
-  "black-myth-ancient-guanyin-bell.jpg",
+  "kasaya-hero-v1.png",
   "black-myth-elder-jinchi.jpg",
   "black-myth-black-bear-guai.jpg",
-  "按住圆点说话",
+  "点击圆点开始说话",
 ];
 const missing = required.filter((item) => !html.includes(item));
 if (missing.length) {
@@ -56,13 +54,13 @@ try {
   console.error(`Research dashboard script syntax error: ${error.message}`);
   process.exit(1);
 }
-for (const item of ["完整学习链路", "导出研究CSV", "人工编码", "支持方式", "GAI故事卡", "学习日记", "访谈线索"]) {
+for (const item of ["教师研究工作台", "学习者产出", "金池长老", "黑熊精", "Hint使用次数", "导出汇总 CSV", "语音交际过程"]) {
   if (!teacher.includes(item)) {
     console.error(`Missing research dashboard content: ${item}`);
     process.exit(1);
   }
 }
-for (const item of ["进入寻迹", "/api/auth/login", "研究者发放的匿名课程账号"]) {
+for (const item of ["袈裟文化任务", "/api/auth/login", "匿名课程账号", "kasaya-hero-v1.png"]) {
   if (!login.includes(item)) {
     console.error(`Missing login content: ${item}`);
     process.exit(1);

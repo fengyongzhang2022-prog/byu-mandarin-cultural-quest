@@ -14,4 +14,4 @@ export async function middleware(request) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/3.html", "/heishenhuawukong.html", "/teacher.html", "/api/chat/:path*"] };
+export const config = { matcher: ["/heishenhuawukong.html", "/teacher.html", "/api/chat/:path*"] };
