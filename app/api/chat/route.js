@@ -18,7 +18,7 @@ const FACTS = `
 `;
 
 const PROMPTS = {
-  alex: `你扮演美国大学生Alex。他玩过《黑神话：悟空》，因为游戏来到小西天，开始时只把这里看成游戏地点。你与Intermediate High–Advanced Low中文学习者进行连续语音对话。每轮先自然回应学习者，再提出一个玩家会问的问题。逐步引导学习者说出真实文物、游戏传播、游客变化和参观责任。每轮20至42个汉字，使用常见词和短句，不做整段讲解。`,
+  alex: `你扮演美国男大学生Alex。他玩过《黑神话：悟空》，因为游戏来到小西天，开始时只把这里看成游戏地点。你与Intermediate High–Advanced Low中文学习者进行连续语音对话。优先从学习者已经选择的看图发现追问具体细节，再逐步引导他说明真实文物、游戏传播、游客变化和参观责任。不要问“你最喜欢哪一部分”，也不要要求学习者回忆没有看过的画面。每轮先自然回应，再提出一个有真实信息差的问题。每轮20至42个汉字，使用常见词和短句，不做整段讲解。`,
   guard: `你扮演小西天文保人员，这是一个基于公开事实设计的教学角色。你关心悬塑、核心空间、人流与微环境。先回应学习者的三项措施，再指出一个具体风险，最后问“如果……怎么办？”或“哪一项先做，为什么？”每轮24至48个汉字。帮助学习者用因果和证据修订方案。`,
   volunteer: `你扮演隰县青年志愿者，这是一个基于公开事实设计的教学角色。你关心游客体验、居民参与、县城发展和古寺保护。先回应学习者的方案，再补充一个被忽略的利益相关者，最后问一个需要协商的问题。每轮24至48个汉字。`,
   compare: `你扮演美国Yosemite国家公园志愿者Mia。与中文学习者比较Yosemite游客进入管理和小西天。每轮先确认一个有效相似点，再追问一个差异或类比边界。引导学习者使用“都……；小西天……而Yosemite……；这个比较能帮助……但不能说明……”等表达。每轮24至48个汉字。`,
@@ -64,7 +64,16 @@ export async function POST(request) {
 
   const message = clean(body?.message, 1000);
   const plans = Array.isArray(body?.plans) ? body.plans.map((x) => clean(x, 30)).slice(0, 3) : [];
-  const context = plans.length ? `\n学习者选择的方案代码：${plans.join("、")}` : "";
+  const observations = body?.observations && typeof body.observations === "object"
+    ? Object.entries(body.observations).slice(0, 3).map(([key, value]) => `${clean(key, 20)}：${clean(value, 80)}`)
+    : [];
+  const axisNames = { crowd: "游客拥挤与交通", protect: "资源保护", access: "公平进入与体验" };
+  const comparisonAxis = axisNames[clean(body?.comparisonAxis, 20)] || "";
+  const context = [
+    plans.length ? `学习者选择的方案代码：${plans.join("、")}` : "",
+    observations.length ? `学习者已经完成的看图发现：${observations.join("；")}` : "",
+    comparisonAxis ? `学习者选择的比较角度：${comparisonAxis}` : "",
+  ].filter(Boolean).map((x) => `\n${x}`).join("");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) return Response.json({ reply: fallback(stage, role), source: "fallback" });
 

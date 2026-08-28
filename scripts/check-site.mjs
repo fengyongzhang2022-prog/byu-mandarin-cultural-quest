@@ -7,7 +7,7 @@ const login = await readFile(new URL("../public/login.html", import.meta.url), "
 const required = [
   "一座古寺的第二次生命",
   "PRE · 任务前文化解释",
-  "DISCOVER · 发现文化证据",
+  "DISCOVER · 看图寻找文化证据",
   "INTERACT · 进入角色对话",
   "DECIDE · 设计交互式文化项目",
   "COMPARE · 把文化差异变成学习资源",
@@ -16,6 +16,12 @@ const required = [
   "日均游客约300至400人",
   "1978尊明代悬塑",
   "小西天 × Yosemite",
+  "多角度图片观察",
+  "放大 · 换角度",
+  "visualObservations",
+  "一座古寺每天迎来",
+  "yosemite-traffic.webp",
+  "xxt-angle-02.webp",
   "给我一点提示",
   "打开摄像头",
   "开始对话",
@@ -49,7 +55,7 @@ for (const [name, source] of [["student", html], ["teacher", teacher]]) {
   }
 }
 
-for (const item of ["从“识别文化”到", "AI语音轮次", "跨文化比较", "播放前测录音", "播放最终解释", "导入记录"]) {
+for (const item of ["从“识别文化”到", "AI语音轮次", "跨文化比较", "看图观察", "播放前测录音", "播放最终解释", "导入记录"]) {
   if (!teacher.includes(item)) {
     console.error(`Missing teacher dashboard content: ${item}`);
     process.exit(1);
