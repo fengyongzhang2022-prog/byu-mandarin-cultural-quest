@@ -3,28 +3,34 @@ export const runtime = "edge";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
 const FACTS = `
-【文化材料】
-1. 袈裟是佛教出家人的服饰，可连接修行身份、朴素与少欲的提醒。
-2. 早期佛教传统中的粪扫衣可由弃布清洗后缝成；拼接外观可提示朴素与节制。
-3. 《西游记》把唐僧的锦襕袈裟写成缀有珍宝的特殊宝衣。
-4. 金池长老已经收藏许多袈裟，看见锦襕袈裟后仍想占有；占有欲推动藏留与纵火。
-5. 黑熊精趁火取走袈裟，并把它当作值得展示的宝物。
-6. 游戏中的人物和场景属于改编叙事；文化事实来自标明来源的教学材料。
-7. 跨文化比较可使用牛仔裤、限量运动鞋、棒球帽或学习者自选物件。比较轴包括原来功能、后来意义、身份、价格和行动后果。
+【本任务可使用的事实】
+1. 小西天原名千佛庵，位于山西省临汾市隰县。
+2. 大雄宝殿面积约169.6平方米，保存1978尊明代悬塑。
+3. 《黑神话：悟空》公布的36处国内取景地中，27处位于山西；小西天的建筑和彩塑进入游戏视觉世界。
+4. 游戏上线前，小西天日均游客约300至400人；2024年国庆假期日均超过1万人。
+5. 2024年当地组织工作专班和志愿者，实行线上预约、分时售票、每日接待上限、单向游线、停车与接驳等措施。
+6. 2026年小西天核心区域使用微环境监测系统，监测温湿度、人群密度和二氧化碳浓度。
+7. Yosemite游客进入管理关注拥挤、交通、公平进入、自然与文化资源保护以及游客体验。
+8. 六张学习者方案卡：分时预约、延长开放时间、数字小西天、核心区外游戏打卡区、停车与接驳、社区共同参与。
+
+【事实边界】
+文保人员、青年志愿者、Alex和Mia均为教学角色。回答只能使用上述事实和学习者已经说过的观点。材料没有提供的信息，要明确说“现有材料没有给出这个信息”，再提出一个可以继续讨论的问题。
 `;
 
 const PROMPTS = {
-  interact: `你扮演《黑神话：悟空》中的金池长老，与美国大学Intermediate High–Advanced Low中文学习者进行连续语音对话。你的声音感是苍老、缓慢、克制，心里仍放不下锦襕袈裟。每轮先回应学习者刚说的内容，再问一个自然的问题。问题围绕收藏、身份、他人眼光、喜欢、占有和后果。每轮总计20至38个汉字。使用常见词和短句。学习者追问时直接回答，并把矛盾继续推向前。`,
-  compare: `你扮演《黑神话：悟空》中的黑熊精，与美国大学Intermediate High–Advanced Low中文学习者协商。你说话低沉、直接、略带不服，认为宝物可以归强者。每轮先回应学习者的一点，再问一个问题。围绕物的价值、拥有资格、行动后果和跨文化物件展开。学习者使用证据后，你可以逐步改口。每轮总计20至38个汉字。`,
-  feedback: `你是中文口语教练。阅读学习者关于袈裟的文化解释，给一条能立即用于补说的建议。建议聚焦证据、因果、比较边界或段落连接；总计不超过38个汉字，并提供半句口语支架。`,
-  story: `你是文化故事整理伙伴。把学习者关于袈裟的解释整理成三段中文：【这件衣服】一句；【人物与行动】一至两句；【我的理解】一句。保留学习者观点，使用常见词，总计100至150个汉字。`,
+  alex: `你扮演美国大学生Alex。他玩过《黑神话：悟空》，因为游戏来到小西天，开始时只把这里看成游戏地点。你与Intermediate High–Advanced Low中文学习者进行连续语音对话。每轮先自然回应学习者，再提出一个玩家会问的问题。逐步引导学习者说出真实文物、游戏传播、游客变化和参观责任。每轮20至42个汉字，使用常见词和短句，不做整段讲解。`,
+  guard: `你扮演小西天文保人员，这是一个基于公开事实设计的教学角色。你关心悬塑、核心空间、人流与微环境。先回应学习者的三项措施，再指出一个具体风险，最后问“如果……怎么办？”或“哪一项先做，为什么？”每轮24至48个汉字。帮助学习者用因果和证据修订方案。`,
+  volunteer: `你扮演隰县青年志愿者，这是一个基于公开事实设计的教学角色。你关心游客体验、居民参与、县城发展和古寺保护。先回应学习者的方案，再补充一个被忽略的利益相关者，最后问一个需要协商的问题。每轮24至48个汉字。`,
+  compare: `你扮演美国Yosemite国家公园志愿者Mia。与中文学习者比较Yosemite游客进入管理和小西天。每轮先确认一个有效相似点，再追问一个差异或类比边界。引导学习者使用“都……；小西天……而Yosemite……；这个比较能帮助……但不能说明……”等表达。每轮24至48个汉字。`,
+  feedback: `你是中文口语教练。根据学习者关于小西天的文化解释，只给一条能在20至30秒补说中立即使用的建议。优先检查：是否用了两个事实、是否解释因果、三项措施是否平衡文物/游客/社区、比较是否有边界。总计不超过46个汉字，并给出半句口语支架。`,
+  story: `你是文化故事整理伙伴。把学习者的讲述整理成四段简短中文：【原来】古寺与文化遗产；【后来】游戏与游客变化；【因此】矛盾和三项方案；【现在】有边界的跨文化理解。保留学习者观点，使用IH–AL可理解的中文，总计130至190个汉字。`,
 };
 
-function clean(value, max = 800) {
+function clean(value, max = 1200) {
   return String(value || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
 }
 
-function history(value) {
+function cleanHistory(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(-10).map((item) => ({
     role: item?.role === "assistant" ? "assistant" : "user",
@@ -32,72 +38,56 @@ function history(value) {
   })).filter((item) => item.content);
 }
 
-function key(value) {
-  const raw = String(value || "").trim();
-  return raw.match(/sk-[A-Za-z0-9_-]+/)?.[0] || raw;
-}
-
-function fallback(stage, message, turns = []) {
-  const text = clean(message, 500);
-  const userTurns = history(turns).filter((item) => item.role === "user").length;
-  if (stage === "feedback") {
-    if (text.length < 20) return "因果：再说人物做了什么，所以发生了什么。";
-    if (!/(因为|所以|因此|结果|后来)/.test(text)) return "因果：补一句“因为……，所以……”。";
-    if (!/(牛仔裤|运动鞋|棒球帽|相似|不同|比较)/.test(text)) return "比较：加入一个熟悉物件，再说一个差异。";
-    return "证据：补一句“收藏记录里……”，让判断更清楚。";
-  }
-  if (stage === "story") {
-    return `【这件衣服】${text.slice(0, 55) || "袈裟连接修行身份、珍贵材料和他人的眼光。"}\n【人物与行动】金池长老已经收藏许多袈裟，仍想占有锦襕袈裟；黑熊精又在火中把它取走。\n【我的理解】物会获得价值，人怎样看物也会改变自己的行动。`;
-  }
-  if (stage === "interact") {
-    if (/(很多|收藏)/.test(text)) return "收藏越多，我越怕别人看轻我。你觉得我真正想守住什么？";
-    if (/(珍贵|宝物|漂亮)/.test(text)) return "人人看它，我也想让人看我。珍贵是谁说出来的？";
-    if (/(欲望|占有|放下)/.test(text)) return "我知道该放下，心里却更想得到。你会怎样劝我？";
-    return userTurns ? "你说的是衣服，也是在说看衣服的人。哪一步让我越走越远？" : "记事人，你看见这件袈裟，先看见衣服，还是先看见宝物？";
-  }
-  if (/(后果|火|伤害)/.test(text)) return "火烧起来以后，宝物还值得拿吗？你用一条证据说服我。";
-  if (/(牛仔裤|运动鞋|棒球帽)/.test(text)) return "这个物件也会代表身份。它和袈裟最大的差异在哪里？";
-  if (/(价值|珍贵|身份)/.test(text)) return "若价值来自众人的眼光，强者拿走它为什么有错？";
-  return userTurns ? "你的解释让我改了一点想法。占有这件衣服改变了谁？" : "人人都说它是宝物，强者拿走它，有什么错？";
+function fallback(stage, role) {
+  if (stage === "feedback") return "补充一个因果句：因此，我们先……，这样既保护文物，也改善游客体验。";
+  if (stage === "story") return "【原来】小西天保存着珍贵的明代悬塑。【后来】游戏让更多人看见古寺，游客也迅速增加。【因此】开放、保护与县城发展需要一起考虑。【现在】预约、分流、社区参与和数字展示可以相互配合，让古寺在当代获得新的生命。";
+  if (stage === "alex") return "我开始明白实景比游戏画面更丰富了。你会用哪个数字提醒游客？";
+  if (stage === "compare") return "这个相似点很清楚。两地的空间和文化意义有什么不能直接等同？";
+  return role === "volunteer"
+    ? "这三项措施怎样让当地青年和居民一起参与，而不只服务游客？"
+    : "如果核心空间同时进入很多人，你的方案先用哪一项降低风险？";
 }
 
 export async function POST(request) {
-  let stage = "interact";
-  let message = "";
-  let turns = [];
+  let body;
   try {
-    const body = await request.json();
-    stage = ["interact", "compare", "feedback", "story"].includes(body?.stage) ? body.stage : "interact";
-    message = clean(body?.message);
-    turns = body?.history;
-    if (!message) return Response.json({ error: "没有收到语音转写。" }, { status: 400 });
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-    const apiKey = key(process.env.DEEPSEEK_API_KEY);
-    if (!apiKey) return Response.json({ reply: fallback(stage, message, turns), demo: true });
+  const stage = clean(body?.stage, 24);
+  const role = clean(body?.role, 24);
+  const promptKey = stage === "stakeholder" ? (role === "volunteer" ? "volunteer" : "guard") : stage;
+  const systemPrompt = PROMPTS[promptKey];
+  if (!systemPrompt) return Response.json({ error: "Unknown stage" }, { status: 400 });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 14000);
+  const message = clean(body?.message, 1000);
+  const plans = Array.isArray(body?.plans) ? body.plans.map((x) => clean(x, 30)).slice(0, 3) : [];
+  const context = plans.length ? `\n学习者选择的方案代码：${plans.join("、")}` : "";
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) return Response.json({ reply: fallback(stage, role), source: "fallback" });
+
+  try {
     const response = await fetch(DEEPSEEK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
-        temperature: .55,
-        max_tokens: stage === "story" ? 280 : 120,
+        temperature: stage === "feedback" ? 0.25 : 0.55,
+        max_tokens: stage === "story" ? 320 : 150,
         messages: [
-          { role: "system", content: `${PROMPTS[stage]}\n${FACTS}\n回应当前话语，保持角色身份和事实边界。` },
-          ...(stage === "feedback" || stage === "story" ? [] : history(turns)),
-          { role: "user", content: message },
+          { role: "system", content: `${FACTS}\n${systemPrompt}${context}` },
+          ...cleanHistory(body?.history),
+          { role: "user", content: message || "请根据本任务事实继续。" },
         ],
       }),
-      signal: controller.signal,
     });
-    clearTimeout(timeout);
-    if (!response.ok) return Response.json({ reply: fallback(stage, message, turns), demo: true });
+    if (!response.ok) throw new Error(`DeepSeek ${response.status}`);
     const data = await response.json();
-    const reply = clean(data?.choices?.[0]?.message?.content, 500) || fallback(stage, message, turns);
-    return Response.json({ reply, demo: false });
+    const reply = clean(data?.choices?.[0]?.message?.content, stage === "story" ? 1200 : 500);
+    return Response.json({ reply: reply || fallback(stage, role), source: "deepseek" });
   } catch {
-    return Response.json({ reply: fallback(stage, message, turns), demo: true });
+    return Response.json({ reply: fallback(stage, role), source: "fallback" });
   }
 }

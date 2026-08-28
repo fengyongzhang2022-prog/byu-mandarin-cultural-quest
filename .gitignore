@@ -6,6 +6,9 @@ node_modules/
 !.env.example
 *.log
 outputs/
+output/
+tmp/
+__pycache__/
 work/
 docs/legacy-student-v1.html
 
