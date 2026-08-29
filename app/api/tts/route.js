@@ -12,7 +12,7 @@ const VOICES = {
 const audioCache = globalThis.__xiaoxitianRoleAudioCache || new Map();
 globalThis.__xiaoxitianRoleAudioCache = audioCache;
 
-async function synthesizeTencent(text, role) {
+async function synthesizeTencent(text, role, speed) {
   const secretId = process.env.TENCENTCLOUD_SECRET_ID;
   const secretKey = process.env.TENCENTCLOUD_SECRET_KEY;
   if (!secretId || !secretKey || role !== "alex") return null;
@@ -29,7 +29,7 @@ async function synthesizeTencent(text, role) {
     VoiceType: voiceType,
     Codec: "mp3",
     SampleRate: 24000,
-    Speed: 0,
+    Speed: speed,
     Volume: 0,
     PrimaryLanguage: 1,
   });
@@ -37,10 +37,10 @@ async function synthesizeTencent(text, role) {
   return { buffer: Buffer.from(result.Audio, "base64"), label: `tencent-${voiceType}` };
 }
 
-async function synthesizeFallback(text, voice) {
+async function synthesizeFallback(text, voice, speed) {
   const tts = new EdgeTTS();
   await tts.synthesize(text, voice.name, {
-    rate: voice.rate,
+    rate: speed < 0 ? "-18%" : voice.rate,
     pitch: voice.pitch,
     volume: "0%",
   });
@@ -61,19 +61,21 @@ export async function POST(request) {
 
   const role = clean(body?.role, 20);
   const text = clean(body?.text);
+  const requestedSpeed = Number(body?.speed);
+  const speed = Number.isFinite(requestedSpeed) ? Math.max(-2, Math.min(2, Math.round(requestedSpeed))) : 0;
   const voice = VOICES[role];
   if (!voice || !text) return Response.json({ error: "Invalid role or text" }, { status: 400 });
 
-  const cacheKey = `${role}:${text}`;
+  const cacheKey = `${role}:${speed}:${text}`;
   let result = audioCache.get(cacheKey);
   if (!result) {
     try {
       try {
-        result = await synthesizeTencent(text, role);
+        result = await synthesizeTencent(text, role, speed);
       } catch {
         result = null;
       }
-      if (!result) result = await synthesizeFallback(text, voice);
+      if (!result) result = await synthesizeFallback(text, voice, speed);
       if (!result.buffer?.length) throw new Error("Empty audio");
       if (audioCache.size >= 60) audioCache.delete(audioCache.keys().next().value);
       audioCache.set(cacheKey, result);
