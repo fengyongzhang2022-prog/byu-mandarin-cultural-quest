@@ -58,6 +58,14 @@ for (const id of ["temple", "game", "traffic"]) {
 }
 await page.screenshot({ path: join(output, "student-discover-desktop.png") });
 await page.click("#discoverNext");
+if (await page.locator("[data-talk-view]").count() < 2) throw new Error("Alex dialogue did not retain the selected visual evidence.");
+await page.locator("[data-talk-view]").first().click();
+await page.waitForSelector("#viewer.open");
+await page.click("#zoomIn");
+if ((await page.locator("#zoomReadout").textContent()) === "100%") throw new Error("Alex visual evidence did not zoom.");
+await page.click("#viewerClose");
+await page.waitForTimeout(240);
+await page.screenshot({ path: join(output, "student-alex-evidence-desktop.png") });
 await page.click("#conversationBtn");
 await page.waitForSelector("#talkOrb.live");
 await page.waitForTimeout(1400);
@@ -129,6 +137,20 @@ if (mobileViewerWidths.scroll > mobileViewerWidths.inner + 1) throw new Error(`M
 await mobilePage.click("#viewerClose");
 await mobilePage.waitForTimeout(240);
 await mobilePage.screenshot({ path: join(output, "student-enter-mobile.png") });
+await mobilePage.evaluate(() => {
+  const state = JSON.parse(localStorage.getItem("xiaoxitian_quest_state_v1"));
+  state.participant = "QA-mobile";
+  state.index = 3;
+  state.maxIndex = 3;
+  state.opened = ["temple", "game", "traffic"];
+  state.observations = { temple: "人物和楼阁密集排列", game: "高密度的悬塑空间", traffic: "观看空间拥挤" };
+  localStorage.setItem("xiaoxitian_quest_state_v1", JSON.stringify(state));
+});
+await mobilePage.reload({ waitUntil: "networkidle" });
+if (await mobilePage.locator("[data-talk-view]").count() !== 3) throw new Error("Mobile Alex dialogue did not retain all selected visuals.");
+const mobileTalkWidths = await mobilePage.evaluate(() => ({ inner: innerWidth, scroll: document.documentElement.scrollWidth }));
+if (mobileTalkWidths.scroll > mobileTalkWidths.inner + 1) throw new Error(`Mobile Alex dialogue overflow: ${JSON.stringify(mobileTalkWidths)}`);
+await mobilePage.screenshot({ path: join(output, "student-alex-evidence-mobile.png") });
 await mobile.close();
 
 const teacherContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

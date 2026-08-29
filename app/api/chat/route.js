@@ -32,7 +32,7 @@ function clean(value, max = 1200) {
 
 function cleanHistory(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(-10).map((item) => ({
+  return value.slice(-6).map((item) => ({
     role: item?.role === "assistant" ? "assistant" : "user",
     content: clean(item?.content, 500),
   })).filter((item) => item.content);
@@ -78,13 +78,16 @@ export async function POST(request) {
   if (!apiKey) return Response.json({ reply: fallback(stage, role), source: "fallback" });
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3200);
     const response = await fetch(DEEPSEEK_URL, {
       method: "POST",
+      signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
         temperature: stage === "feedback" ? 0.25 : 0.55,
-        max_tokens: stage === "story" ? 320 : 150,
+        max_tokens: stage === "story" ? 320 : stage === "feedback" ? 100 : 90,
         messages: [
           { role: "system", content: `${FACTS}\n${systemPrompt}${context}` },
           ...cleanHistory(body?.history),
@@ -92,6 +95,7 @@ export async function POST(request) {
         ],
       }),
     });
+    clearTimeout(timeout);
     if (!response.ok) throw new Error(`DeepSeek ${response.status}`);
     const data = await response.json();
     const reply = clean(data?.choices?.[0]?.message?.content, stage === "story" ? 1200 : 500);

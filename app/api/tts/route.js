@@ -1,0 +1,92 @@
+import { EdgeTTS } from "@andresaya/edge-tts";
+import tencentcloud from "tencentcloud-sdk-nodejs-tts";
+
+export const runtime = "nodejs";
+export const maxDuration = 10;
+
+const VOICES = {
+  alex: { name: "zh-CN-YunjianNeural", rate: "-4%", pitch: "0Hz" },
+  guard: { name: "zh-CN-YunyangNeural", rate: "-8%", pitch: "-2Hz" },
+};
+
+const audioCache = globalThis.__xiaoxitianRoleAudioCache || new Map();
+globalThis.__xiaoxitianRoleAudioCache = audioCache;
+
+async function synthesizeTencent(text, role) {
+  const secretId = process.env.TENCENTCLOUD_SECRET_ID;
+  const secretKey = process.env.TENCENTCLOUD_SECRET_KEY;
+  if (!secretId || !secretKey || role !== "alex") return null;
+  const voiceType = Number(process.env.TENCENT_TTS_VOICE_TYPE || 502006);
+  const TtsClient = tencentcloud.tts.v20190823.Client;
+  const client = new TtsClient({
+    credential: { secretId, secretKey },
+    region: process.env.TENCENTCLOUD_REGION || "ap-beijing",
+    profile: { httpProfile: { endpoint: "tts.tencentcloudapi.com", reqTimeout: 8 } },
+  });
+  const result = await client.TextToVoice({
+    Text: text,
+    SessionId: crypto.randomUUID(),
+    VoiceType: voiceType,
+    Codec: "mp3",
+    SampleRate: 24000,
+    Speed: 0,
+    Volume: 0,
+    PrimaryLanguage: 1,
+  });
+  if (!result?.Audio) throw new Error("Tencent TTS returned no audio");
+  return { buffer: Buffer.from(result.Audio, "base64"), label: `tencent-${voiceType}` };
+}
+
+async function synthesizeFallback(text, voice) {
+  const tts = new EdgeTTS();
+  await tts.synthesize(text, voice.name, {
+    rate: voice.rate,
+    pitch: voice.pitch,
+    volume: "0%",
+  });
+  return { buffer: tts.toBuffer(), label: voice.name };
+}
+
+function clean(value, max = 220) {
+  return String(value || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
+}
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const role = clean(body?.role, 20);
+  const text = clean(body?.text);
+  const voice = VOICES[role];
+  if (!voice || !text) return Response.json({ error: "Invalid role or text" }, { status: 400 });
+
+  const cacheKey = `${role}:${text}`;
+  let result = audioCache.get(cacheKey);
+  if (!result) {
+    try {
+      try {
+        result = await synthesizeTencent(text, role);
+      } catch {
+        result = null;
+      }
+      if (!result) result = await synthesizeFallback(text, voice);
+      if (!result.buffer?.length) throw new Error("Empty audio");
+      if (audioCache.size >= 60) audioCache.delete(audioCache.keys().next().value);
+      audioCache.set(cacheKey, result);
+    } catch {
+      return Response.json({ error: "Voice unavailable" }, { status: 503 });
+    }
+  }
+
+  return new Response(result.buffer, {
+    headers: {
+      "Content-Type": "audio/mpeg",
+      "Cache-Control": "private, max-age=86400",
+      "X-Role-Voice": result.label,
+    },
+  });
+}
