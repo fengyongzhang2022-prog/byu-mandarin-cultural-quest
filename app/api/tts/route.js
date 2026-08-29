@@ -72,7 +72,8 @@ export async function POST(request) {
     try {
       try {
         result = await synthesizeTencent(text, role, speed);
-      } catch {
+      } catch (error) {
+        console.error(JSON.stringify({ level: "error", msg: "tencent_tts_failed", code: error?.code || "unknown", error: error?.message || String(error) }));
         result = null;
       }
       if (!result) result = await synthesizeFallback(text, voice, speed);
@@ -83,6 +84,8 @@ export async function POST(request) {
       return Response.json({ error: "Voice unavailable" }, { status: 503 });
     }
   }
+
+  console.log(JSON.stringify({ level: "info", msg: "tts_provider", provider: result.label, role, speed }));
 
   return new Response(result.buffer, {
     headers: {
