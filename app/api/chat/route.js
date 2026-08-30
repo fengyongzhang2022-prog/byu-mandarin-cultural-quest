@@ -40,6 +40,12 @@ const PROMPTS = {
   green_sako: `你提供一个基于公开材料的“萨科尔斯基视角”教学对话，不冒充本人。与Intermediate High到Advanced Low中文学习者对话。先回应学习者对帮助与功劳的解释，再从“钱做了什么、没有做什么”“故事何时开始”“为什么26年后仍值得寻找”中追问一个信息差。每轮24至52个汉字，只问一个问题。`,
   green_editor: `你是美国大学校园媒体的双语编辑。学习者已经指出第一稿标题的遗漏。请生成准确的第二稿，格式为“英文标题｜中文标题｜两句中文导语”。必须保留5000美元的真实作用，同时明确故事早于捐款开始，并提到长期行动或治理背景。英文标题不超过14个词，中文总计不超过110个汉字。`,
   green_feedback: `你是中文口语教练。只给一条可在20至30秒补说中立即使用的建议。优先检查：是否使用两个时间节点、是否区分帮助与单一因果、是否面向美国受众解释背景。总计不超过48个汉字，并给一个半句支架。`,
+  green_annotate: `你是面向美国中高级中文学习者的词语注释助手。只解释用户选中的1至8个汉字，不延伸故事事实。严格返回四行：
+词语：用户选中的词语
+拼音：带声调符号的汉语拼音
+英文：简明英文释义
+例句：8至20个汉字的简单自然例句
+不要添加其他内容。`,
 };
 
 function clean(value, max = 1200) {
@@ -54,7 +60,11 @@ function cleanHistory(value) {
   })).filter((item) => item.content);
 }
 
-function fallback(stage, role) {
+function fallback(stage, role, message = "") {
+  if (stage === "green_annotate") {
+    const word = clean(message, 8) || "这个词";
+    return `词语：${word}\n拼音：—\n英文：selected expression\n例句：请结合听力材料理解“${word}”。`;
+  }
   if (stage === "green_editor") return "A Gift That Joined a 40-Year Fight Against Sand｜一份善意怎样进入四十年的治沙行动｜1999年的5000美元帮助购买树苗，但故事早在1985年已经开始。森林也来自此后二十多年的坚持、技术与治理。";
   if (stage === "green_feedback") return "补充一个边界句：这笔钱帮助了树苗进入沙地，但不能替代长期治沙和治理实践。";
   if (stage === "green_sako") return "这笔钱确实帮助购买了树苗。为什么不能把整片森林都写成它的功劳？";
@@ -98,7 +108,7 @@ export async function POST(request) {
     Array.isArray(body?.shots) && body.shots.length ? `学习者选择的镜头：${body.shots.map((x) => clean(x, 4)).join("、")}` : "",
   ].filter(Boolean).map((x) => `\n${x}`).join("");
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) return Response.json({ reply: fallback(stage, role), source: "fallback" });
+  if (!apiKey) return Response.json({ reply: fallback(stage, role, message), source: "fallback" });
 
   try {
     const controller = new AbortController();
@@ -109,8 +119,8 @@ export async function POST(request) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "deepseek-chat",
-        temperature: stage === "feedback" || stage === "green_feedback" ? 0.25 : 0.55,
-        max_tokens: stage === "story" ? 320 : stage === "green_editor" ? 220 : stage === "feedback" || stage === "green_feedback" ? 100 : 90,
+        temperature: stage === "feedback" || stage === "green_feedback" || stage === "green_annotate" ? 0.25 : 0.55,
+        max_tokens: stage === "story" ? 320 : stage === "green_editor" ? 220 : stage === "feedback" || stage === "green_feedback" || stage === "green_annotate" ? 100 : 90,
         messages: [
           { role: "system", content: `${stage.startsWith("green_") ? GREEN_FACTS : FACTS}\n${systemPrompt}${context}` },
           ...cleanHistory(body?.history),
@@ -122,8 +132,8 @@ export async function POST(request) {
     if (!response.ok) throw new Error(`DeepSeek ${response.status}`);
     const data = await response.json();
     const reply = clean(data?.choices?.[0]?.message?.content, stage === "story" ? 1200 : 500);
-    return Response.json({ reply: reply || fallback(stage, role), source: "deepseek" });
+    return Response.json({ reply: reply || fallback(stage, role, message), source: "deepseek" });
   } catch {
-    return Response.json({ reply: fallback(stage, role), source: "fallback" });
+    return Response.json({ reply: fallback(stage, role, message), source: "fallback" });
   }
 }
