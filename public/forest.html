@@ -7,12 +7,6 @@
   <meta name="description" content="面向美国中高级中文学习者的GAI中国故事任务：5000美元，5万棵树。">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preload" as="image" href="/assets/green-story-forest-hero-v2.webp" fetchpriority="high">
-  <link rel="preload" as="image" href="/assets/green-story-vocabulary-scenes-v2.png">
-  <link rel="preload" as="image" href="/assets/green-story-vocabulary-scenes-v3.png">
-  <link rel="preload" as="fetch" href="/assets/green-story-film-01-v5.zh-CN.vtt" crossorigin>
-  <link rel="preload" as="fetch" href="/assets/green-story-film-01-v5.en-US.vtt" crossorigin>
-  <link rel="preload" as="fetch" href="/assets/green-story-film-02-v5.zh-CN.vtt" crossorigin>
-  <link rel="preload" as="fetch" href="/assets/green-story-film-02-v5.en-US.vtt" crossorigin>
   <title>5000美元，5万棵树 | GAI中国故事任务</title>
   <style>
     :root{--bg:#0c130f;--panel:#131b16;--panel2:#19221c;--ink:#f1efe8;--muted:#a9b0a9;--line:#344038;--green:#a5c979;--green2:#d9e8c7;--sand:#c2a778;--danger:#df927c;--radius:10px;--shadow:0 24px 70px rgba(2,8,4,.32)}
@@ -139,8 +133,20 @@
   CONTEXT_FILM[1].video='/assets/green-story-film-02-v5.mp4';
   CONTEXT_FILM[1].poster='/assets/green-story-film-02-poster-v3.jpg';
   CONTEXT_FILM[1].tracks={zh:'/assets/green-story-film-02-v5.zh-CN.vtt',en:'/assets/green-story-film-02-v5.en-US.vtt'};
-  const PRELOAD_IMAGES=[...Object.values(STORY_IMAGES),...CONTEXT_FILM.map(item=>item.poster).filter(Boolean),...['/assets/vocab-iron-shovel.webp','/assets/vocab-shoulder-pole.webp','/assets/vocab-steel-drill.webp','/assets/vocab-shifting-sand.webp','/assets/vocab-shrub.webp','/assets/vocab-tree.webp','/assets/vocab-fundraising.webp','/assets/vocab-foundation.webp','/assets/vocab-commemorate.webp','/assets/vocab-desert-control.webp','/assets/vocab-gradually.webp','/assets/vocab-seedlings.webp','/assets/vocab-machinery.webp','/assets/vocab-reunion.webp']];
-  PRELOAD_IMAGES.forEach(src=>{const preload=new Image();preload.decoding='async';preload.src=src});
+  const NEXT_PAGE_ASSETS={
+    0:[['image',STORY_IMAGES.D]],
+    1:[['image',STORY_IMAGES.A]],
+    2:[['image',STORY_IMAGES.C]],
+    3:[['image',STORY_IMAGES.E]],
+    4:[['image',STORY_IMAGES.D]],
+    5:[['image',CONTEXT_FILM[0].poster]],
+    6:[['image',STORY_IMAGES.A]],
+    7:[['image',STORY_IMAGES.G]]
+  };
+  const warmedAssets=new Set();
+  const connectionAllowsPrefetch=kind=>{const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;if(connection?.saveData)return false;if(kind==='video'&&/^(slow-)?2g$/.test(connection?.effectiveType||''))return false;return true};
+  function prefetchAsset(kind,src){if(!src||warmedAssets.has(src)||!connectionAllowsPrefetch(kind))return;warmedAssets.add(src);const link=document.createElement('link');link.rel='prefetch';link.href=src;link.fetchPriority='low';if(kind==='image')link.as='image';link.dataset.greenWarmup=kind;document.head.appendChild(link)}
+  function warmNextPage(){const assets=NEXT_PAGE_ASSETS[state.index]||[];const run=()=>assets.forEach(([kind,src],index)=>setTimeout(()=>prefetchAsset(kind,src),kind==='video'?1200:index*120));const schedule=()=>window.requestIdleCallback?window.requestIdleCallback(run,{timeout:1800}):setTimeout(run,500);if(document.readyState==='complete')schedule();else window.addEventListener('load',schedule,{once:true})}
   const COUNTRY_CARDS={
     survival:{era:'1980年代',image:'A',title:'沙区里的日常生活',fact:'井背塘当时没有公路和电。土房会被风沙堵门，树苗靠人背，水靠扁担和水桶运。',connection:'这解释了殷玉珍最初面对的困难，也说明治沙从日常生存开始。'},
     project:{era:'1978—2050',image:'D',title:'“三北”防护林工程',fact:'“三北”指东北、华北和西北。中国从1978年起在这些地区持续开展防风固沙、植被保护和生态建设。',connection:'殷玉珍的个人行动发生在中国北方长期生态治理的进程中。'},
@@ -224,7 +230,6 @@
     if(!labeled.lead&&clean){labeled.lead=clean}
     return`<section class="editor-draft"><h3>GAI 叙事线</h3><table class="editor-table"><tbody><tr><th scope="row">英文标题</th><td>${esc(labeled.english||'—')}</td></tr><tr><th scope="row">中文标题</th><td>${esc(labeled.chinese||'—')}</td></tr><tr><th scope="row">中文导语</th><td>${esc(labeled.lead||'—')}</td></tr></tbody></table></section>`;
   }
-  function warmVideo(src){if(!src||document.querySelector(`link[data-video-prefetch="${src}"]`))return;const link=document.createElement('link');link.rel='prefetch';link.as='video';link.href=src;link.dataset.videoPrefetch=src;document.head.appendChild(link)}
   const persist=()=>localStorage.setItem('green_story_state',JSON.stringify(state));
   const event=(type,data={})=>{state.events.push({type,at:new Date().toISOString(),...data});persist()};
   const toast=msg=>{const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)};
@@ -265,7 +270,7 @@
     dock.innerHTML=`<button class="dock-back" id="dockBack">← 上一步</button><button class="dock-next" id="dockNext" ${!target||target.disabled?'disabled':''}>${esc(label)}</button>`;
     document.body.appendChild(dock);document.getElementById('dockBack').onclick=()=>go(state.index-1);if(target)document.getElementById('dockNext').onclick=()=>target.click();
   }
-  function render(){document.body.classList.toggle('is-entry',state.index===0);if(state.index!==7&&state.cameraEnabled){stopCameraPreview();state.cameraEnabled=false;persist()}nav();renderContext();[renderEnter,renderPre,renderScene,renderTime,renderEvidence,renderInteract,renderReframeV2,renderTellWithBackground,renderReflect][state.index]();cleanInterfaceCopy();bindShared();mountPageNav()}
+  function render(){document.body.classList.toggle('is-entry',state.index===0);if(state.index!==7&&state.cameraEnabled){stopCameraPreview();state.cameraEnabled=false;persist()}nav();renderContext();[renderEnter,renderPre,renderScene,renderTime,renderEvidence,renderInteract,renderReframeV2,renderTellWithBackground,renderReflect][state.index]();cleanInterfaceCopy();bindShared();mountPageNav();warmNextPage()}
   function showLayoutPreview(){const old=document.querySelector('.layout-preview-modal');if(old)old.remove();const wrap=document.createElement('div');wrap.className='layout-preview-modal hint-modal';wrap.style='position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px';wrap.innerHTML=`<div style="width:min(620px,100%);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:26px"><p class="eyebrow">INTERNAL PREVIEW</p><h3>跨页查看布局</h3><p class="small">仅当前预览链接可见；普通教师不会看到此入口，也不会因此跳过任务。</p><div class="preview-stage-grid">${STAGES.map((stage,i)=>`<button class="quiet" data-preview-stage="${i}">${i+1}. ${stage[1]}</button>`).join('')}</div><button class="primary" id="closeLayoutPreview">关闭</button></div>`;document.body.appendChild(wrap);wrap.querySelectorAll('[data-preview-stage]').forEach(button=>button.onclick=()=>{wrap.remove();go(Number(button.dataset.previewStage))});document.getElementById('closeLayoutPreview').onclick=()=>wrap.remove()}
   function bindShared(){document.getElementById('hintBtn').onclick=showHints;const previewButton=document.getElementById('layoutPreviewBtn');if(previewButton){previewButton.hidden=!PREVIEW_MODE;if(PREVIEW_MODE)previewButton.onclick=showLayoutPreview}document.getElementById('restartTrialBtn').onclick=()=>{if(confirm('重新开始会清除这台设备上的本次试用进度。确定继续吗？')){localStorage.removeItem('green_story_state');location.href='/forest.html'}}}
   function renderEnter(){
@@ -367,7 +372,6 @@
   function renderEvidence(){renderListeningChapter('three')}
   function renderInteract(){
     const stops=[['1985—1986','在风沙中生活，失败后继续试'],['1999','一位美国教师从电视报道看见她的行动'],['2000','两人见面，共同种下一棵树'],['二十多年','树木生长，治沙和公共支持继续'],['2026','网络寻人，时隔26年再次相见']];
-    warmVideo(CONTEXT_FILM[2].video);
     panel.innerHTML=`<section class="story-overview"><div class="comprehension-intro"><div><p class="eyebrow">听完三个时间段</p><h2>现在，再看完整故事</h2><p class="lead">一份善意进入了一场早已开始、也没有因捐款结束的长期行动。</p></div><img src="${STORY_IMAGES.D}" alt="沙地与森林的对照画面"></div><section class="final-story-map"><h3>故事地图</h3><div class="story-map">${stops.map(([year,title])=>`<div class="map-stop done"><div><b>${year}</b><span>${title}</span></div></div>`).join('')}</div></section><button class="primary" id="quizNext">理解故事发生的中国背景</button></section>`;
     document.getElementById('quizNext').onclick=advance;
   }
@@ -378,10 +382,10 @@
     const preview=scene.poster||STORY_IMAGES[scene.image];
     panel.innerHTML=`<p class="eyebrow">时代背景 · 教学微纪录片与真实新闻</p><h2 class="film-library-title"><span>从哪一段开始，</span><span>由你决定</span></h2>
       <section class="context-film">
-        <nav class="film-library" aria-label="三段可自由选择的视频">${CONTEXT_FILM.map((film,i)=>`<button type="button" class="film-choice ${i===state.contextFilmScene?'selected':''} ${watched.includes(i)?'watched':''}" data-film-index="${i}" aria-pressed="${i===state.contextFilmScene}"><img src="${film.poster||STORY_IMAGES[film.image]}" alt="${film.title}"><small><span>0${i+1} / ${film.year}</span></small><b>${film.title}</b><span>${film.speaker}</span></button>`).join('')}</nav>
+        <nav class="film-library" aria-label="三段可自由选择的视频">${CONTEXT_FILM.map((film,i)=>`<button type="button" class="film-choice ${i===state.contextFilmScene?'selected':''} ${watched.includes(i)?'watched':''}" data-film-index="${i}" aria-pressed="${i===state.contextFilmScene}"><img src="${film.poster||STORY_IMAGES[film.image]}" alt="${film.title}" loading="${i===state.contextFilmScene?'eager':'lazy'}" decoding="async" fetchpriority="${i===state.contextFilmScene?'high':'low'}"><small><span>0${i+1} / ${film.year}</span></small><b>${film.title}</b><span>${film.speaker}</span></button>`).join('')}</nav>
         <div class="film-player">
           <div class="film-player-head"><div><p>${scene.year} · ${scene.speaker}</p><h3 id="activeFilmTitle">${scene.title}</h3></div><button type="button" class="quiet caption-toggle" id="captionToggle" ${scene.tracks?'':'hidden'}>字幕：关</button></div>
-          <div class="film-stage news" id="filmStage"><video id="contextVideo" controls playsinline preload="auto" poster="${preview}" src="${scene.video}">${scene.tracks?`<track kind="subtitles" srclang="zh-CN" label="中文字幕" src="${scene.tracks.zh}"><track kind="subtitles" srclang="en-US" label="English" src="${scene.tracks.en}">`:''}</video><div class="video-loading" id="videoLoading" hidden>正在缓冲视频…</div></div>
+          <div class="film-stage news" id="filmStage"><video id="contextVideo" controls playsinline preload="metadata" poster="${preview}" src="${scene.video}">${scene.tracks?`<track kind="subtitles" srclang="zh-CN" label="中文字幕" src="${scene.tracks.zh}"><track kind="subtitles" srclang="en-US" label="English" src="${scene.tracks.en}">`:''}</video><div class="video-loading" id="videoLoading" hidden>正在缓冲视频…</div></div>
           <div class="film-controls"><button type="button" class="primary" id="playSelectedFilm">▶ 播放这一段</button><span class="film-progress" id="filmStatus">${watched.length}/3 已看 · 三段可按任意顺序选择</span></div>
         </div>
       </section>
