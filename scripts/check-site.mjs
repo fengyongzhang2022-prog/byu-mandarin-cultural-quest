@@ -3,6 +3,9 @@ import { readFile } from "node:fs/promises";
 const html = await readFile(new URL("../public/heishenhuawukong.html", import.meta.url), "utf8");
 const teacher = await readFile(new URL("../public/teacher.html", import.meta.url), "utf8");
 const login = await readFile(new URL("../public/login.html", import.meta.url), "utf8");
+const culture = await readFile(new URL("../public/culture.html", import.meta.url), "utf8");
+const cultureLogin = await readFile(new URL("../public/culture-login.html", import.meta.url), "utf8");
+const middleware = await readFile(new URL("../middleware.js", import.meta.url), "utf8");
 
 const required = [
   "一座古寺的第二次生命",
@@ -79,4 +82,42 @@ for (const old of ["金池长老", "黑熊精", "袈裟文化任务", "土地神
   }
 }
 
-console.log("Xiaoxitian site content check passed.");
+for (const item of [
+  "一座古寺，一件袈裟",
+  "一座古寺的第二次生命",
+  "一件不该被抢的衣服",
+  "先看见，再解释",
+  "kasaya_jinchi",
+  "kasaya_feedback",
+  "跨文化比较",
+  "语音输入",
+  "导出本章记录",
+]) {
+  if (!culture.includes(item)) {
+    console.error(`Missing culture collection content: ${item}`);
+    process.exit(1);
+  }
+}
+
+for (const [name, source] of [["culture", culture], ["culture login", cultureLogin]]) {
+  const match = source.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
+  if (!match) {
+    console.error(`${name} client script was not found.`);
+    process.exit(1);
+  }
+  try {
+    new Function(match[1]);
+  } catch (error) {
+    console.error(`${name} script syntax error: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+for (const item of ['"/forest.html"', 'NextResponse.rewrite', 'matcher: ["/"]']) {
+  if (!middleware.includes(item)) {
+    console.error(`Missing culture host routing: ${item}`);
+    process.exit(1);
+  }
+}
+
+console.log("Xiaoxitian and culture collection content checks passed.");

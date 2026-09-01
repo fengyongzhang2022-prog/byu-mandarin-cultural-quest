@@ -3,16 +3,21 @@ import { tts } from "tencentcloud-sdk-nodejs-tts";
 export const runtime = "nodejs";
 export const maxDuration = 10;
 
-const ROLES = new Set(["alex"]);
+const VOICE_TYPES = {
+  alex: Number(process.env.TENCENT_TTS_VOICE_TYPE || 502006),
+  american: Number(process.env.TENCENT_TTS_AMERICAN_VOICE_TYPE || 502006),
+  planter: Number(process.env.TENCENT_TTS_PLANTER_VOICE_TYPE || 502001),
+  narrator: Number(process.env.TENCENT_TTS_NARRATOR_VOICE_TYPE || 101013),
+};
 
 const audioCache = globalThis.__xiaoxitianRoleAudioCache || new Map();
 globalThis.__xiaoxitianRoleAudioCache = audioCache;
 
-async function synthesizeTencent(text, role, speed) {
+async function synthesizeTencent(text, role, speed, codec = "mp3") {
   const secretId = process.env.TENCENTCLOUD_SECRET_ID;
   const secretKey = process.env.TENCENTCLOUD_SECRET_KEY;
-  if (!secretId || !secretKey || role !== "alex") return null;
-  const voiceType = Number(process.env.TENCENT_TTS_VOICE_TYPE || 502006);
+  if (!secretId || !secretKey || !VOICE_TYPES[role]) return null;
+  const voiceType = VOICE_TYPES[role];
   const TtsClient = tts.v20190823.Client;
   const client = new TtsClient({
     credential: { secretId, secretKey },
@@ -23,14 +28,15 @@ async function synthesizeTencent(text, role, speed) {
     Text: text,
     SessionId: crypto.randomUUID(),
     VoiceType: voiceType,
-    Codec: "mp3",
-    SampleRate: 24000,
+    Codec: codec,
+    SampleRate: codec === "wav" && voiceType === 101013 ? 16000 : 24000,
     Speed: speed,
     Volume: 0,
     PrimaryLanguage: 1,
+    EnableSubtitle: true,
   });
   if (!result?.Audio) throw new Error("Tencent TTS returned no audio");
-  return { buffer: Buffer.from(result.Audio, "base64"), label: `tencent-${voiceType}` };
+  return { buffer: Buffer.from(result.Audio, "base64"), subtitles: result.Subtitles || [], label: `tencent-${role}-${voiceType}` };
 }
 
 function clean(value, max = 220) {
@@ -49,14 +55,15 @@ export async function POST(request) {
   const text = clean(body?.text);
   const requestedSpeed = Number(body?.speed);
   const speed = Number.isFinite(requestedSpeed) ? Math.max(-2, Math.min(2, Math.round(requestedSpeed))) : 0;
-  if (!ROLES.has(role) || !text) return Response.json({ error: "Invalid role or text" }, { status: 400 });
+  if (!Object.hasOwn(VOICE_TYPES, role) || !text) return Response.json({ error: "Invalid role or text" }, { status: 400 });
 
-  const cacheKey = `${role}:${speed}:${text}`;
+  const codec = body?.timestamps === true ? "wav" : "mp3";
+  const cacheKey = `${role}:${speed}:${codec}:${text}`;
   let result = audioCache.get(cacheKey);
   if (!result) {
     try {
       try {
-        result = await synthesizeTencent(text, role, speed);
+        result = await synthesizeTencent(text, role, speed, codec);
       } catch (error) {
         console.error(JSON.stringify({ level: "error", msg: "tencent_tts_failed", code: error?.code || "unknown", error: error?.message || String(error) }));
         result = null;
@@ -71,6 +78,14 @@ export async function POST(request) {
   }
 
   console.log(JSON.stringify({ level: "info", msg: "tts_provider", provider: result.label, role, speed }));
+
+  if (body?.timestamps === true) {
+    return Response.json({
+      audio: result.buffer.toString("base64"),
+      subtitles: result.subtitles,
+      provider: result.label,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  }
 
   return new Response(result.buffer, {
     headers: {

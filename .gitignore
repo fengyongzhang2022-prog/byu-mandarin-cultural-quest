@@ -8,6 +8,7 @@ node_modules/
 outputs/
 output/
 tmp/
+scripts/.tmp-green-story-films/
 __pycache__/
 work/
 docs/legacy-student-v1.html
@@ -15,3 +16,6 @@ docs/legacy-student-v1.html
 .vercel
 .env*
 !.env.example
+
+.vercel
+.env*
