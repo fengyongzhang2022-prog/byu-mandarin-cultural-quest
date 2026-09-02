@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>共同种下 · 每页排版预览</title>
+  <style>
+    :root{--ink:#263128;--muted:#68736b;--green:#315f3c;--line:#d5dbd3;--paper:#f5f4ee;--panel:#fffefa}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,"Noto Sans SC","Microsoft YaHei",sans-serif}
+    .preview-header{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);background:rgba(245,244,238,.94);backdrop-filter:blur(16px)}
+    .header-inner{width:min(1280px,calc(100% - 40px));margin:auto;padding:20px 0 16px}.eyebrow{margin:0;color:var(--green);font-size:11px;font-weight:800;letter-spacing:.14em}.header-row{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-top:7px}.header-row h1{margin:0;font:600 clamp(27px,4vw,44px)/1.08 Georgia,"Noto Serif SC",serif;letter-spacing:-.03em}.header-note{margin:9px 0 0;color:var(--muted);font-size:14px;line-height:1.6}.header-link{color:var(--green);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}.stage-tabs{display:flex;gap:7px;overflow-x:auto;padding:16px 0 2px;scrollbar-width:thin}.stage-tab{flex:0 0 auto;padding:9px 12px;border:1px solid var(--line);border-radius:5px;background:transparent;color:var(--muted);font:700 13px/1.2 inherit;cursor:pointer}.stage-tab:hover,.stage-tab[aria-selected=true]{border-color:var(--green);background:var(--green);color:#fff}.preview-main{width:min(1280px,calc(100% - 40px));margin:28px auto 80px}.preview-page{display:none}.preview-page.active{display:block}.page-meta{display:flex;align-items:center;justify-content:space-between;gap:15px;margin:0 0 12px}.page-meta h2{margin:0;font:600 23px/1.25 Georgia,"Noto Serif SC",serif}.page-meta span{color:var(--muted);font-size:12px}.frame-wrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);box-shadow:0 18px 55px rgba(34,49,38,.09)}iframe{display:block;width:100%;min-height:720px;border:0;background:#f7f6f1}.preview-footer{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.6}
+    @media(max-width:680px){.header-inner,.preview-main{width:calc(100% - 28px)}.header-row{align-items:flex-start;flex-direction:column;gap:8px}.header-link{font-size:12px}.stage-tabs{margin-right:-14px;padding-right:14px}.page-meta{align-items:flex-start;flex-direction:column;gap:5px}.frame-wrap{border-radius:7px}iframe{min-height:760px}}
+  </style>
+</head>
+<body>
+  <header class="preview-header">
+    <div class="header-inner">
+      <p class="eyebrow">GREEN STORY · LAYOUT REVIEW</p>
+      <div class="header-row"><div><h1>共同种下 · 每页排版预览</h1><p class="header-note">选择上方页签查看对应页面。这里加载的是实际站点页面，方便检查标题、图片、注释和任务区块的相对位置。</p></div><a class="header-link" href="forest.html?preview=1" target="_blank" rel="noopener">打开完整交互 ↗</a></div>
+      <nav class="stage-tabs" id="stageTabs" aria-label="页面预览导航"></nav>
+    </div>
+  </header>
+  <main class="preview-main" id="previewMain"></main>
+  <script>
+    const stages=[['01','走进森林'],['02','听前观察'],['03','来到毛乌素'],['04','电视里的故事'],['05','二十六年后'],['06','完整故事'],['07','时代背景'],['08','重新讲述'],['09','回看变化']];
+    const tabs=document.getElementById('stageTabs'),main=document.getElementById('previewMain');
+    stages.forEach(([number,title],index)=>{
+      const tab=document.createElement('button');tab.className='stage-tab';tab.type='button';tab.textContent=`${number} · ${title}`;tab.setAttribute('aria-selected',index===0?'true':'false');tab.dataset.stage=index;tabs.appendChild(tab);
+      const section=document.createElement('section');section.className=`preview-page ${index===0?'active':''}`;section.dataset.stage=index;section.innerHTML=`<div class="page-meta"><h2>${number} · ${title}</h2><span>实际页面预览 · 可在框内滚动</span></div><div class="frame-wrap"><iframe title="${title} 页面预览" loading="${index===0?'eager':'lazy'}" src="forest.html?preview=1&stage=${index}&embed=1"></iframe></div>`;main.appendChild(section);
+      const frame=section.querySelector('iframe');frame.addEventListener('load',()=>{try{const height=Math.max(720,frame.contentDocument.documentElement.scrollHeight+12);frame.style.height=`${height}px`}catch(error){/* same-origin only */}});
+    });
+    function showStage(index){tabs.querySelectorAll('.stage-tab').forEach(tab=>tab.setAttribute('aria-selected',tab.dataset.stage===String(index)?'true':'false'));main.querySelectorAll('.preview-page').forEach(page=>page.classList.toggle('active',page.dataset.stage===String(index)));window.scrollTo({top:0,behavior:'smooth'})}
+    tabs.addEventListener('click',event=>{const tab=event.target.closest('.stage-tab');if(tab)showStage(tab.dataset.stage)});
+  </script>
+</body>
+</html>
