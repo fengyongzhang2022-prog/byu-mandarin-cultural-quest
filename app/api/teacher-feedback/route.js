@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import COS from "cos-nodejs-sdk-v5";
+import { verifySession } from "../../../lib/auth";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,86 @@ async function resolveStorage() {
 
 function cleanText(value, max = 4000) {
   return String(value || "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ").trim().slice(0, max);
+}
+
+function cookieValue(header, name) {
+  return String(header || "").split(";").map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1) || "";
+}
+
+async function requireTeacher(request) {
+  const session = await verifySession(cookieValue(request.headers.get("cookie"), "xunji_session"));
+  if (!session) return { error: Response.json({ error: "请先使用研究者账号登录。" }, { status: 401, headers: { "Cache-Control": "private, no-store" } }) };
+  if (session.role !== "teacher") return { error: Response.json({ error: "当前账号没有查看教师反馈的权限。" }, { status: 403, headers: { "Cache-Control": "private, no-store" } }) };
+  return { session };
+}
+
+async function listFeedbackKeys(storage) {
+  const keys = [];
+  let Marker;
+  do {
+    const page = await cosCall(storage.client, "getBucket", {
+      Bucket: storage.Bucket,
+      Region: storage.Region,
+      Prefix: "private/teacher-feedback/",
+      ...(Marker ? { Marker } : {}),
+      MaxKeys: 1000,
+    });
+    for (const item of Array.isArray(page?.Contents) ? page.Contents : []) {
+      if (String(item?.Key || "").endsWith(".json")) keys.push(item.Key);
+    }
+    Marker = page?.IsTruncated === "true" || page?.IsTruncated === true ? page?.NextMarker : "";
+  } while (Marker);
+  return keys;
+}
+
+async function readCosJson(storage, Key) {
+  const object = await cosCall(storage.client, "getObject", { Bucket: storage.Bucket, Region: storage.Region, Key });
+  const text = Buffer.isBuffer(object?.Body) ? object.Body.toString("utf8") : String(object?.Body || "");
+  return JSON.parse(text);
+}
+
+function publicRecord(record) {
+  const voiceParts = ["value", "revision"].flatMap((part) => {
+    const item = record?.voice?.[part];
+    return item?.key ? [{ part, seconds: Math.max(0, Number(item.seconds) || 0) }] : [];
+  });
+  return {
+    id: cleanText(record?.id, 80),
+    participantAlias: cleanText(record?.participantAlias, 40),
+    teachingYears: cleanText(record?.teachingYears, 20),
+    ratings: Object.fromEntries(RATING_KEYS.map((key) => [key, Number(record?.ratings?.[key]) || 0])),
+    comments: { value: cleanText(record?.comments?.value), revision: cleanText(record?.comments?.revision) },
+    submittedAt: cleanText(record?.submittedAt, 40),
+    hasVoice: voiceParts.length > 0,
+    voiceSeconds: voiceParts.reduce((sum, item) => sum + item.seconds, 0),
+    voiceParts,
+  };
+}
+
+async function readDirectFeedback() {
+  const storage = await resolveStorage();
+  const keys = await listFeedbackKeys(storage);
+  const records = [];
+  for (let index = 0; index < keys.length; index += 20) {
+    const batch = await Promise.all(keys.slice(index, index + 20).map((key) => readCosJson(storage, key).catch(() => null)));
+    records.push(...batch.filter(Boolean).map(publicRecord));
+  }
+  records.sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+  return records;
+}
+
+async function readDirectAudio(audioId, part) {
+  if (!/^[0-9a-f-]{36}$/i.test(audioId) || !new Set(["value", "revision"]).has(part)) return null;
+  const storage = await resolveStorage();
+  const key = (await listFeedbackKeys(storage)).find((item) => item.endsWith(`/${audioId}.json`));
+  if (!key) return null;
+  const record = await readCosJson(storage, key);
+  const voice = record?.voice?.[part];
+  const voiceKey = String(voice?.key || "");
+  const expectedPrefix = key.slice(0, -5);
+  if (!voiceKey.startsWith(`${expectedPrefix}-${part}.`) || !voiceKey.startsWith("private/teacher-feedback/")) return null;
+  const object = await cosCall(storage.client, "getObject", { Bucket: storage.Bucket, Region: storage.Region, Key: voiceKey });
+  return { body: object.Body, mime: cleanText(voice?.mime, 80) || object?.headers?.["content-type"] || "audio/webm" };
 }
 
 function validateSubmission(body) {
@@ -136,19 +217,29 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
-  const audioId = new URL(request.url).searchParams.get("audio");
+  const auth = await requireTeacher(request);
+  if (auth.error) return auth.error;
+  const url = new URL(request.url);
+  const audioId = url.searchParams.get("audio");
+  const audioPart = url.searchParams.get("part") === "revision" ? "revision" : "value";
   const endpoint = apiUrl(audioId ? `/green/teacher-feedback/${encodeURIComponent(audioId)}/audio` : "/green/teacher-feedback");
-  if (!endpoint || !process.env.GREEN_PROXY_SECRET || !process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY) {
-    return Response.json({ error: "匿名反馈提交已启用；研究者汇总读取服务尚未配置。" }, { status: 503 });
-  }
   try {
-    const upstream = await fetch(endpoint, { headers: proxyHeaders({ "x-green-feedback-admin": process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY }), cache: "no-store" });
-    if (audioId) {
-      if (!upstream.ok) return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
-      return new Response(await upstream.arrayBuffer(), { status: 200, headers: { "Content-Type": upstream.headers.get("content-type") || "audio/webm", "Cache-Control": "private, no-store" } });
+    if (endpoint && process.env.GREEN_PROXY_SECRET && process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY) {
+      const upstream = await fetch(endpoint, { headers: proxyHeaders({ "x-green-feedback-admin": process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY }), cache: "no-store" });
+      if (audioId) {
+        if (!upstream.ok) return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status });
+        return new Response(await upstream.arrayBuffer(), { status: 200, headers: { "Content-Type": upstream.headers.get("content-type") || "audio/webm", "Cache-Control": "private, no-store" } });
+      }
+      return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status, headers: { "Cache-Control": "private, no-store" } });
     }
-    return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status, headers: { "Cache-Control": "no-store" } });
-  } catch {
-    return Response.json({ error: "暂时无法读取反馈。" }, { status: 502 });
+    if (audioId) {
+      const audio = await readDirectAudio(audioId, audioPart);
+      if (!audio) return Response.json({ error: "没有找到这段语音反馈。" }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
+      return new Response(audio.body, { status: 200, headers: { "Content-Type": audio.mime, "Cache-Control": "private, no-store", "Content-Disposition": "inline" } });
+    }
+    return Response.json({ records: await readDirectFeedback() }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    console.error("teacher-feedback read failed", error);
+    return Response.json({ error: "暂时无法读取教师反馈，请稍后重试。" }, { status: 502, headers: { "Cache-Control": "private, no-store" } });
   }
 }
