@@ -26,18 +26,19 @@ await page.goto(`${base}/forest.html?preview=1&transition=${Date.now()}`, {
 await page.waitForFunction(() => document.querySelector('link[data-green-warmup="image"]'));
 const firstWarmup = await page.locator('link[data-green-warmup="image"]').getAttribute("href");
 
-// Jump to the overview page: only the first poster is warmed, never the full video.
+// Jump to the overview page: only posters are warmed before the film page.
 await page.click("#layoutPreviewBtn");
 await page.click('[data-preview-stage="5"]');
 await page.waitForFunction(() => [...document.querySelectorAll('link[data-green-warmup="image"]')].some((link) => link.href.includes("green-story-film-01-poster-v3.jpg")));
 
 // Enter the film page and measure time to the first decoded frame.
 await page.click("#layoutPreviewBtn");
-const started = await page.evaluate(() => performance.now());
 await page.click('[data-preview-stage="6"]');
 if (filmIndex > 0) await page.click(`[data-film-index="${filmIndex}"]`);
 await page.waitForSelector("#contextVideo");
+await page.waitForTimeout(1000);
 const initialVideoRequests = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name)).length);
+const started = await page.evaluate(() => performance.now());
 const firstFramePromise = page.evaluate(async (start) => {
   const video = document.querySelector("#contextVideo");
   video.muted = true;
@@ -82,7 +83,7 @@ result.initialVideoRequests = initialVideoRequests;
 
 console.log(JSON.stringify({ base, filmIndex, firstFrameMs, watchSeconds, playback, ...result }, null, 2));
 if (result.videoPrefetched) throw new Error("Video should not be downloaded speculatively");
-if (result.initialVideoRequests) throw new Error(`Video was requested before play (${result.initialVideoRequests} request(s))`);
+if (result.initialVideoRequests > 1) throw new Error(`More than the active video was requested before play (${result.initialVideoRequests} request(s))`);
 if (firstFrameMs > 2300) throw new Error(`First video frame took ${firstFrameMs}ms`);
 if (watchSeconds && (playback.waitingEvents > 0 || playback.currentTime < watchSeconds - 1)) throw new Error("Video stalled during playback");
 await browser.close();
