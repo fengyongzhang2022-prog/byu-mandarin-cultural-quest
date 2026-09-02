@@ -504,7 +504,15 @@
       const voice=response.headers.get('X-Role-Voice')||'unknown';if(!response.ok||!voice.startsWith('tencent-'))throw new Error('tencent-unavailable');
       const decoded=await narrationContext.decodeAudioData(await response.arrayBuffer()),source=narrationContext.createBufferSource();source.buffer=decoded;source.connect(narrationContext.destination);activeNarration=source;
       source.onended=()=>{activeNarration=null;if(onend)onend()};event('tts_play',{voice,slow:rate<.8});source.start();
-    }catch{toast('腾讯云自然语音暂时不可用，请稍后重试。');if(onerror)onerror()}
+    }catch{
+      if('speechSynthesis'in window){
+        const fallback=new SpeechSynthesisUtterance(text);fallback.lang='zh-CN';fallback.rate=rate;fallback.pitch=1;
+        fallback.onend=()=>{event('tts_play',{voice:'browser-zh-CN',slow:rate<.8,fallback:true});if(onend)onend()};
+        fallback.onerror=()=>{toast('语音暂时无法播放，请稍后重试。');if(onerror)onerror()};
+        speechSynthesis.speak(fallback);toast('已自动切换为浏览器中文语音。');return;
+      }
+      toast('语音暂时无法播放，请稍后重试。');if(onerror)onerror()
+    }
   }
   const fmt=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
   function stopCameraPreview(){if(cameraPreviewStream)cameraPreviewStream.getTracks().forEach(track=>track.stop());cameraPreviewStream=null}

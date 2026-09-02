@@ -13,6 +13,11 @@ const VOICE_TYPES = {
 const audioCache = globalThis.__xiaoxitianRoleAudioCache || new Map();
 globalThis.__xiaoxitianRoleAudioCache = audioCache;
 
+function sampleRateForVoice(voiceType) {
+  // Tencent's 101xxx premium voices, including narrator 101013, support 8/16 kHz only.
+  return voiceType >= 101000 && voiceType < 102000 ? 16000 : 24000;
+}
+
 async function synthesizeTencent(text, role, speed, codec = "mp3") {
   const secretId = process.env.TENCENTCLOUD_SECRET_ID;
   const secretKey = process.env.TENCENTCLOUD_SECRET_KEY;
@@ -29,7 +34,7 @@ async function synthesizeTencent(text, role, speed, codec = "mp3") {
     SessionId: crypto.randomUUID(),
     VoiceType: voiceType,
     Codec: codec,
-    SampleRate: codec === "wav" && voiceType === 101013 ? 16000 : 24000,
+    SampleRate: sampleRateForVoice(voiceType),
     Speed: speed,
     Volume: 0,
     PrimaryLanguage: 1,
