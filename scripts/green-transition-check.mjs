@@ -38,7 +38,7 @@ await page.click('[data-preview-stage="6"]');
 if (filmIndex > 0) await page.click(`[data-film-index="${filmIndex}"]`);
 await page.waitForSelector("#contextVideo");
 const initialVideoRequests = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name)).length);
-const firstFrameMs = await page.evaluate(async (start) => {
+const firstFramePromise = page.evaluate(async (start) => {
   const video = document.querySelector("#contextVideo");
   video.muted = true;
   window.__greenVideoWaits = 0;
@@ -51,6 +51,8 @@ const firstFrameMs = await page.evaluate(async (start) => {
   window.__greenVideoWaits = 0;
   return Math.round(performance.now() - start);
 }, started);
+await page.click("#playSelectedFilm");
+const firstFrameMs = await firstFramePromise;
 
 if (watchSeconds) await page.waitForTimeout(watchSeconds * 1000);
 const playback = await page.evaluate(() => {
@@ -67,7 +69,7 @@ const playback = await page.evaluate(() => {
 });
 
 const result = await page.evaluate((firstWarmupValue) => {
-  const videoEntries = performance.getEntriesByType("resource").filter((entry) => entry.name.includes("green-story-film-01-v5.mp4"));
+  const videoEntries = performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name));
   return {
     firstWarmup: firstWarmupValue,
     initialVideoRequests: 0,
