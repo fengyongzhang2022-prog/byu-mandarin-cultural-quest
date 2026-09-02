@@ -6,6 +6,7 @@ const login = await readFile(new URL("../public/login.html", import.meta.url), "
 const culture = await readFile(new URL("../public/culture.html", import.meta.url), "utf8");
 const cultureLogin = await readFile(new URL("../public/culture-login.html", import.meta.url), "utf8");
 const middleware = await readFile(new URL("../middleware.js", import.meta.url), "utf8");
+const forest = await readFile(new URL("../public/forest.html", import.meta.url), "utf8");
 
 const required = [
   "一座古寺的第二次生命",
@@ -111,6 +112,75 @@ for (const [name, source] of [["culture", culture], ["culture login", cultureLog
     console.error(`${name} script syntax error: ${error.message}`);
     process.exit(1);
   }
+}
+
+const forestRequired = [
+  "Intermediate High<br>中级高段",
+  "Advanced Low<br>高级低段",
+  "完成这节课后，我能……",
+  "By the end of this lesson, I can…",
+  "我能结合故事、视频、时间线和国情卡片",
+  "对照学习目标 02 自查",
+  "Check your work against Learning Goal 02",
+  "对照学习目标 03 核对内容",
+  "照片没有成功显示",
+  "按时间整理三项信息",
+  "5000美元到底起了什么作用",
+  "CAUSE_ROLES",
+  "先读这一句",
+  "这条信息有什么用",
+  "和视频一起理解",
+  "FILM_CARD_LINKS",
+  "选择一条稍后要用的信息",
+  "根据故事，哪句话说得最准确",
+  "听前热身 · 不计入评价",
+  "这两个人是谁？",
+  "他们现在还在联系吗？",
+  "图片中的土地后来变成森林了吗？",
+  "CAUSE_CRITERIA",
+  "可点击“继续录音”",
+  "FINAL_CRITERIA",
+  "readMediaDuration",
+  "MicroMessenger",
+  "recordingTechNote",
+  "requestData",
+  "Listening comprehension · Replay as needed",
+  "Check your work against Learning Goal 03",
+  "Watch the clips, then open the context cards",
+];
+const forestMissing = forestRequired.filter((item) => !forest.includes(item));
+if (forestMissing.length) {
+  console.error(`Missing Green Story refinement: ${forestMissing.join(", ")}`);
+  process.exit(1);
+}
+const forestForbidden = [
+  "听前热身 · 不计入完成评价",
+  "学习活动从分段听力和图片观察开始，再引入时间线与国情卡片",
+  "Goal 01<br>",
+  "Goal 02<br>",
+  "Goal 03<br>",
+  "主旨检查：哪一句得到整条时间线的支持",
+  "2026年的重逢让森林快速形成",
+  "BEAT THE AI · 打败 AI",
+  "可选挑战 · OPTIONAL",
+  "可选挑战 · CHOOSE ONE",
+  "Vocabulary support · 需要时点击打开",
+];
+const forestUnexpected = forestForbidden.filter((item) => forest.includes(item));
+if (forestUnexpected.length) {
+  console.error(`Outdated Green Story copy remains: ${forestUnexpected.join(", ")}`);
+  process.exit(1);
+}
+const forestScript = forest.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
+if (!forestScript) {
+  console.error("Green Story client script was not found.");
+  process.exit(1);
+}
+try {
+  new Function(forestScript[1]);
+} catch (error) {
+  console.error(`Green Story script syntax error: ${error.message}`);
+  process.exit(1);
 }
 
 for (const item of ['"/forest.html"', 'NextResponse.rewrite', 'matcher: ["/", "/teacher-feedback.html"]']) {

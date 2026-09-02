@@ -44,6 +44,40 @@ async function synthesizeTencent(text, role, speed, codec = "mp3") {
   return { buffer: Buffer.from(result.Audio, "base64"), subtitles: result.Subtitles || [], label: `tencent-${role}-${voiceType}` };
 }
 
+async function synthesizeFromExistingTencentService(text, role, speed, timestamps) {
+  const configured = process.env.TENCENT_TTS_FALLBACK_URL;
+  const localPreviewService = process.env.NODE_ENV !== "production"
+    ? "https://byu-mandarin-cultural-quest.vercel.app/api/tts"
+    : "";
+  const endpoint = configured || localPreviewService;
+  if (!endpoint) return null;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, role, speed, timestamps }),
+    signal: AbortSignal.timeout(9000),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Existing Tencent service returned ${response.status}`);
+
+  if (timestamps) {
+    const data = await response.json();
+    if (!String(data?.provider || "").startsWith("tencent-") || !data?.audio) {
+      throw new Error("Existing service did not return Tencent audio");
+    }
+    return {
+      buffer: Buffer.from(data.audio, "base64"),
+      subtitles: Array.isArray(data.subtitles) ? data.subtitles : [],
+      label: data.provider,
+    };
+  }
+
+  const label = response.headers.get("x-role-voice") || "";
+  if (!label.startsWith("tencent-")) throw new Error("Existing service did not return Tencent audio");
+  return { buffer: Buffer.from(await response.arrayBuffer()), subtitles: [], label };
+}
+
 function clean(value, max = 220) {
   return String(value || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
 }
@@ -69,6 +103,7 @@ export async function POST(request) {
     try {
       try {
         result = await synthesizeTencent(text, role, speed, codec);
+        if (!result) result = await synthesizeFromExistingTencentService(text, role, speed, body?.timestamps === true);
       } catch (error) {
         console.error(JSON.stringify({ level: "error", msg: "tencent_tts_failed", code: error?.code || "unknown", error: error?.message || String(error) }));
         result = null;
