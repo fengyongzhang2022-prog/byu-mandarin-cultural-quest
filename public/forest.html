@@ -6,7 +6,9 @@
   <meta name="theme-color" content="#101510">
   <meta name="description" content="面向美国中高级中文学习者的GAI中国故事任务：5000美元，5万棵树。">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preload" as="image" href="/assets/green-story-forest-hero-v2.webp" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/green-story-forest-hero-720.webp" media="(max-width: 680px)" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/green-story-forest-hero-1280.webp" media="(min-width: 681px) and (max-width: 1600px)" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/green-story-forest-hero-v2.webp" media="(min-width: 1601px)" fetchpriority="high">
   <title>5000美元，5万棵树 | GAI中国故事任务</title>
   <style>
     :root{--bg:#0c130f;--panel:#131b16;--panel2:#19221c;--ink:#f1efe8;--muted:#a9b0a9;--line:#344038;--green:#a5c979;--green2:#d9e8c7;--sand:#c2a778;--danger:#df927c;--radius:10px;--shadow:0 24px 70px rgba(2,8,4,.32)}
@@ -78,6 +80,16 @@
     @media(max-width:680px){.story-overview .final-story-map .story-map{grid-template-columns:1fr}.story-overview .final-story-map .map-stop,.story-overview .final-story-map .map-stop:nth-child(odd){padding:18px 0;border-left:0}.story-overview .final-story-map .map-stop b{font-size:23px}.story-overview .final-story-map .map-stop span{font-size:17px}}
     .embed-mode .top,.embed-mode .page-nav-dock{display:none}.embed-mode .shell{min-height:100vh}.embed-mode main{padding-top:42px}.embed-mode aside{display:none}
   </style>
+  <style id="green-media-loading-fix">
+    .hero{background:radial-gradient(circle at 78% 26%,#718c5d 0,#3e5940 20%,#243724 48%,#101911 100%)}
+    .hero-media{position:absolute;inset:0;z-index:0;display:block;overflow:hidden;pointer-events:none}
+    .hero-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;opacity:0;transition:opacity .32s ease;will-change:opacity}
+    .hero-media img.loaded{opacity:1}
+    .hero:before{z-index:1}
+    .hero-copy,.hero>.review-entry{position:relative;z-index:2}
+    @media(max-width:680px){.hero-media img{object-position:60% center}}
+    @media(prefers-reduced-motion:reduce){.hero-media img{transition:none}}
+  </style>
 </head>
 <body>
   <header class="top"><div class="brand"><span class="mark">林</span><div><b>共同种下</b><small>GREEN STORY</small></div></div><nav class="trail" id="trail" aria-label="学习进度"></nav><div class="top-actions"><button id="hintBtn">？提示</button><button id="layoutPreviewBtn" hidden>布局预览</button><button id="restartTrialBtn">重新开始</button></div></header>
@@ -97,6 +109,7 @@
     E:{year:'2026',title:'为什么还要寻找',text:'2026年5月，殷玉珍通过网络寻找赛考斯。8月，两人时隔26年重逢，重返毛乌素，并再次共同种下一棵树。',why:'这张卡把感谢、记忆、承诺与共同的绿色未来连接起来。',keys:'2026 寻找 重逢 26年 感谢 记忆 现在'}
   };
   const STORY_IMAGES={A:'/assets/green-story-1985-v2.webp',B:'/assets/green-story-1999.webp',C:'/assets/green-story-2000-v2.webp',D:'/assets/green-story-hero.webp',E:'/assets/green-story-2026-v2.webp',F:'/assets/green-story-planting.webp',G:'/assets/green-story-forest-hero-v2.webp'};
+  const heroMediaMarkup=()=>`<picture class="hero-media"><source media="(max-width:680px)" srcset="/assets/green-story-forest-hero-720.webp"><source media="(max-width:1600px)" srcset="/assets/green-story-forest-hero-1280.webp"><img src="/assets/green-story-forest-hero-v2.webp" width="1920" height="1080" fetchpriority="high" decoding="async" alt=""></picture>`;
   const SHOTS=[['A','1985，低成活率','故事在捐款前已经开始'],['B','1999，看到电视报道','善意从看见另一个人的行动开始'],['C','2000，共同种树','帮助具体进入了什么行动'],['D','钱花完以后','长期行动、技术与治理继续发生'],['E','2026，跨海重逢','一份帮助为什么被记了26年'],['F','再种一棵树','把感谢带向共同的未来']];
   const HINTS={pre:['先只说照片里能够看见的细节，不急着猜故事。','再说你的想法和一个真正想知道的问题。三段录音会在最后与完整讲述并置。'],scene:['需要时先打开听前词汇；图解可以帮助你理解治沙环境。','听第一遍抓人物与困难，第二遍抓数字和方法。'],time:['先判断5000美元进入故事时，故事已经进行了多久。','注意“帮助”和“起点”不是同一个意思。'],evidence:['先听钱花完以后发生了什么。','注意5万多棵与整个毛乌素治理之间的范围差别。'],interact:['按时间顺序在脑中重放三段故事。','错误答案会提示你回到相应的时间段。'],reframe:['三段视频可以按任意顺序观看，字幕可以自行选择。','国情卡片会分别说明“事实是什么”和“它怎样帮助理解故事”。','口头说明：如果只写5000美元，读者可能误解什么？'],tell:['先用大约20秒说清开头、中间和结尾。','GAI会根据受众、时间线、国情背景和因果边界给一条建议。','收到建议后，再选择只录声音或同时录制画面；正式讲述至少60秒，不设上限。'],reflect:['比较听前的“看—想—问”、试讲思路和最后讲述中的人物、时间与因果。']};
   HINTS.tell=['先选择一类听众，查看这类听众最需要的解释。','三段时间线都要保留，但普通学生、环境科学学生和校园媒体编辑的重点可以不同。','正式讲述至少60秒；可以只录声音，也可以自愿打开摄像头。'];
@@ -286,7 +299,10 @@
     dock.innerHTML=`<button class="dock-back" id="dockBack">← 上一步</button><button class="dock-next" id="dockNext" ${!target||target.disabled?'disabled':''}>${esc(label)}</button>`;
     document.body.appendChild(dock);document.getElementById('dockBack').onclick=()=>go(state.index-1);if(target)document.getElementById('dockNext').onclick=()=>target.click();
   }
-  function render(){document.body.classList.toggle('is-entry',state.index===0);document.body.classList.toggle('embed-mode',EMBED_MODE);if(state.index!==7&&state.cameraEnabled){stopCameraPreview();state.cameraEnabled=false;persist()}nav();renderContext();[renderEnter,renderPre,renderScene,renderTime,renderEvidence,renderInteract,renderReframeV2,renderTellWithBackground,renderReflect][state.index]();cleanInterfaceCopy();bindShared();mountPageNav();warmNextPage()}
+  function mountHeroMedia(){panel.querySelectorAll('.hero').forEach(hero=>{if(!hero.querySelector('.hero-media'))hero.insertAdjacentHTML('afterbegin',heroMediaMarkup())})}
+  function deferVideoLoading(){panel.querySelectorAll('video').forEach(video=>{if(!video.srcObject)video.preload='none'})}
+  function markHeroImageLoaded(){panel.querySelectorAll('.hero-media img').forEach(image=>{const show=()=>image.classList.add('loaded');if(image.complete&&image.naturalWidth)show();else image.addEventListener('load',show,{once:true})})}
+  function render(){document.body.classList.toggle('is-entry',state.index===0);document.body.classList.toggle('embed-mode',EMBED_MODE);if(state.index!==7&&state.cameraEnabled){stopCameraPreview();state.cameraEnabled=false;persist()}nav();renderContext();[renderEnter,renderPre,renderScene,renderTime,renderEvidence,renderInteract,renderReframeV2,renderTellWithBackground,renderReflect][state.index]();mountHeroMedia();deferVideoLoading();markHeroImageLoaded();cleanInterfaceCopy();bindShared();mountPageNav();warmNextPage()}
   function showLayoutPreview(){const old=document.querySelector('.layout-preview-modal');if(old)old.remove();const wrap=document.createElement('div');wrap.className='layout-preview-modal hint-modal';wrap.style='position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px';wrap.innerHTML=`<div style="width:min(620px,100%);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:26px"><p class="eyebrow">INTERNAL PREVIEW</p><h3>跨页查看布局</h3><p class="small">仅当前预览链接可见；普通教师不会看到此入口，也不会因此跳过任务。</p><div class="preview-stage-grid">${STAGES.map((stage,i)=>`<button class="quiet" data-preview-stage="${i}">${i+1}. ${stage[1]}</button>`).join('')}</div><button class="primary" id="closeLayoutPreview">关闭</button></div>`;document.body.appendChild(wrap);wrap.querySelectorAll('[data-preview-stage]').forEach(button=>button.onclick=()=>{wrap.remove();go(Number(button.dataset.previewStage))});document.getElementById('closeLayoutPreview').onclick=()=>wrap.remove()}
   function bindShared(){document.getElementById('hintBtn').onclick=showHints;const previewButton=document.getElementById('layoutPreviewBtn');if(previewButton){previewButton.hidden=!PREVIEW_MODE;if(PREVIEW_MODE)previewButton.onclick=showLayoutPreview}document.getElementById('restartTrialBtn').onclick=()=>{if(confirm('重新开始会清除这台设备上的本次试用进度。确定继续吗？')){localStorage.removeItem('green_story_state');location.href='/forest.html'}}}
   function renderEnter(){

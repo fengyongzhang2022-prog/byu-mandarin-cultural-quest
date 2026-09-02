@@ -55,4 +55,5 @@ const metrics = await page.evaluate(() => {
 });
 
 console.log(JSON.stringify({ base, throttle, wallMs: Date.now() - started, ...metrics }, null, 2));
+if (throttle && metrics.lcpMs > 3000) throw new Error(`首屏最大内容仍在 ${metrics.lcpMs}ms 才完成`);
 await browser.close();

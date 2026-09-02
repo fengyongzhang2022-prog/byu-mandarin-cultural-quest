@@ -37,6 +37,7 @@ const started = await page.evaluate(() => performance.now());
 await page.click('[data-preview-stage="6"]');
 if (filmIndex > 0) await page.click(`[data-film-index="${filmIndex}"]`);
 await page.waitForSelector("#contextVideo");
+const initialVideoRequests = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name)).length);
 const firstFrameMs = await page.evaluate(async (start) => {
   const video = document.querySelector("#contextVideo");
   video.muted = true;
@@ -69,14 +70,17 @@ const result = await page.evaluate((firstWarmupValue) => {
   const videoEntries = performance.getEntriesByType("resource").filter((entry) => entry.name.includes("green-story-film-01-v5.mp4"));
   return {
     firstWarmup: firstWarmupValue,
+    initialVideoRequests: 0,
     videoPrefetched: Boolean(document.querySelector('link[data-green-warmup="video"]')),
     videoRequests: videoEntries.length,
     videoTransferredKB: Math.round(videoEntries.reduce((sum, entry) => sum + (entry.transferSize || entry.encodedBodySize || 0), 0) / 1024),
   };
 }, firstWarmup);
+result.initialVideoRequests = initialVideoRequests;
 
 console.log(JSON.stringify({ base, filmIndex, firstFrameMs, watchSeconds, playback, ...result }, null, 2));
 if (result.videoPrefetched) throw new Error("Video should not be downloaded speculatively");
+if (result.initialVideoRequests) throw new Error(`Video was requested before play (${result.initialVideoRequests} request(s))`);
 if (firstFrameMs > 2300) throw new Error(`First video frame took ${firstFrameMs}ms`);
 if (watchSeconds && (playback.waitingEvents > 0 || playback.currentTime < watchSeconds - 1)) throw new Error("Video stalled during playback");
 await browser.close();
