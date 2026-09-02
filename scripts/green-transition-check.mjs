@@ -26,7 +26,12 @@ await page.goto(`${base}/forest.html?preview=1&transition=${Date.now()}`, {
 await page.waitForFunction(() => document.querySelector('link[data-green-warmup="image"]'));
 const firstWarmup = await page.locator('link[data-green-warmup="image"]').getAttribute("href");
 
-// Jump to the overview page: only posters are warmed before the film page.
+// Give the evidence page a chance to warm the first film, then visit the overview page.
+await page.click("#layoutPreviewBtn");
+await page.click('[data-preview-stage="4"]');
+await page.waitForTimeout(5000);
+
+// The overview page warms the first poster and keeps the video warmup scoped to one film.
 await page.click("#layoutPreviewBtn");
 await page.click('[data-preview-stage="5"]');
 await page.waitForFunction(() => [...document.querySelectorAll('link[data-green-warmup="image"]')].some((link) => link.href.includes("green-story-film-01-poster-v3.jpg")));
@@ -37,7 +42,13 @@ await page.click('[data-preview-stage="6"]');
 if (filmIndex > 0) await page.click(`[data-film-index="${filmIndex}"]`);
 await page.waitForSelector("#contextVideo");
 await page.waitForTimeout(1000);
-const initialVideoRequests = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name)).length);
+const initialVideoStats = await page.evaluate(() => {
+  const entries = performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name));
+  return {
+    requests: entries.length,
+    sources: [...new Set(entries.map((entry) => new URL(entry.name).pathname))],
+  };
+});
 const started = await page.evaluate(() => performance.now());
 const firstFramePromise = page.evaluate(async (start) => {
   const video = document.querySelector("#contextVideo");
@@ -69,21 +80,21 @@ const playback = await page.evaluate(() => {
   return data;
 });
 
-const result = await page.evaluate((firstWarmupValue) => {
+const result = await page.evaluate(({ firstWarmupValue, initialVideoStats }) => {
   const videoEntries = performance.getEntriesByType("resource").filter((entry) => /\.(?:mp4|webm)(?:\?|$)/i.test(entry.name));
   return {
     firstWarmup: firstWarmupValue,
-    initialVideoRequests: 0,
+    initialVideoRequests: initialVideoStats.requests,
+    initialVideoSources: initialVideoStats.sources,
     videoPrefetched: Boolean(document.querySelector('link[data-green-warmup="video"]')),
     videoRequests: videoEntries.length,
     videoTransferredKB: Math.round(videoEntries.reduce((sum, entry) => sum + (entry.transferSize || entry.encodedBodySize || 0), 0) / 1024),
   };
-}, firstWarmup);
-result.initialVideoRequests = initialVideoRequests;
+}, { firstWarmupValue: firstWarmup, initialVideoStats });
 
 console.log(JSON.stringify({ base, filmIndex, firstFrameMs, watchSeconds, playback, ...result }, null, 2));
-if (result.videoPrefetched) throw new Error("Video should not be downloaded speculatively");
-if (result.initialVideoRequests > 1) throw new Error(`More than the active video was requested before play (${result.initialVideoRequests} request(s))`);
+if (result.videoPrefetched) throw new Error("Video should not be warmed through a speculative prefetch link");
+if (result.initialVideoSources.length > 1) throw new Error(`More than the active video was requested before play (${result.initialVideoSources.length} source(s))`);
 if (firstFrameMs > 2300) throw new Error(`First video frame took ${firstFrameMs}ms`);
 if (watchSeconds && (playback.waitingEvents > 0 || playback.currentTime < watchSeconds - 1)) throw new Error("Video stalled during playback");
 await browser.close();

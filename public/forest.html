@@ -153,7 +153,7 @@
   const CONTEXT_FILM=[
     {year:'1978—1999',speaker:'教学微纪录片',role:'narrator',image:'A',title:'毛乌素的十四年',subtitle:'三北工程、井背塘的生活条件，以及反复失败后的治沙方法。',audio:'在中国北方，有一片地方叫毛乌素沙地。故事要从1978年说起。那一年，中国启动“三北”防护林工程，开始在东北、华北和西北防风固沙。可是，国家工程落到一个家庭身上，会是什么样子呢？1985年，19岁的殷玉珍来到井背塘。那里没有公路，也没有电。她住的土房半埋在沙里，一夜风沙就能堵住门。第二年，她和丈夫卖掉家里唯一的一只羊，换回600多棵树苗。他们用铁锹挖坑，用扁担挑水，再用钢钎在硬沙地上打洞。可一场大风过后，活下来的树苗不到10棵。失败了，怎么办？他们没有停，而是一次次重来：先固定流沙，再种灌木和乔木。十四年后，他们已经种出3万多亩林地。也就在那一年，700公里外的洛阳，一位美国教师从电视里看到了她的故事。下一段，我们看看这条远方的消息，后来带来了什么。'},
     {year:'1999—2026',speaker:'教学微纪录片',role:'narrator',image:'C',title:'电视、邮件与5000美元',subtitle:'跨国筹款、共同种树，以及道路修通后持续发生的变化。',audio:'上一段里，赛考斯在电视上看到了殷玉珍。接下来，故事从电视屏幕走进了现实。1999年，他给许多机构发电子邮件，希望为治沙筹款。大约两个月后，他通过一家基金会筹到5000美元。殷玉珍只留下一张美元作纪念，其余的钱都买了树苗。2000年春天，赛考斯来到毛乌素。两个人第一次见面，还一起种下一棵树。后来，他们慢慢失去了联系。但是，治沙没有停。殷玉珍一家继续种树、补苗、护林。2007年，一条8公里长的公路修到她家门口，树苗和工具终于可以用车运进沙地。当地项目也陆续送来苗木和机械。他们一边种，一边看哪些树能活，再不断调整树种和方法。当年用那笔捐款买的树苗，后来长成了5万多棵树。到了2026年，一次重逢又把两个人带回毛乌素。这一次，他们还会一起种树吗？下一段，是真实新闻现场。'},
-     {year:'2026',speaker:'真实新闻报道',type:'news',image:'E',title:'二十六年后，两人在鄂尔多斯重逢',subtitle:'听真实新闻中的人物姓名、网络寻人和重返沙海。',video:'/assets/green-story-news-2026-web-v7.mp4',source:'https://news.ifeng.com/c/8vqX77NmXst'}
+     {year:'2026',speaker:'真实新闻报道',type:'news',image:'E',title:'二十六年后，两人在鄂尔多斯重逢',subtitle:'听真实新闻中的人物姓名、网络寻人和重返沙海。',video:'/assets/green-story-news-2026-web-v8.mp4',source:'https://news.ifeng.com/c/8vqX77NmXst'}
   ];
    CONTEXT_FILM[0].video='/assets/green-story-film-01-v7.mp4';
   CONTEXT_FILM[0].poster='/assets/green-story-film-01-poster-v3.jpg';
@@ -166,15 +166,15 @@
     1:[['image',STORY_IMAGES.A]],
     2:[['image',STORY_IMAGES.C]],
     3:[['image',STORY_IMAGES.E]],
-    4:[['image',STORY_IMAGES.D]],
-    5:[['image',CONTEXT_FILM[0].poster]],
+     4:[['image',STORY_IMAGES.D],['video',CONTEXT_FILM[0].video],['video',CONTEXT_FILM[1].video],['video',CONTEXT_FILM[2].video]],
+     5:[['image',CONTEXT_FILM[0].poster],['video',CONTEXT_FILM[0].video],['video',CONTEXT_FILM[1].video],['video',CONTEXT_FILM[2].video]],
     6:[['image',STORY_IMAGES.A]],
     7:[['image',STORY_IMAGES.G]]
   };
   const warmedAssets=new Set();
   const connectionAllowsPrefetch=kind=>{const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;if(connection?.saveData)return false;if(kind==='video'&&/^(slow-)?2g$/.test(connection?.effectiveType||''))return false;return true};
-  function prefetchAsset(kind,src){if(!src||warmedAssets.has(src)||!connectionAllowsPrefetch(kind))return;warmedAssets.add(src);const link=document.createElement('link');link.rel='prefetch';link.href=src;link.fetchPriority='low';if(kind==='image')link.as='image';link.dataset.greenWarmup=kind;document.head.appendChild(link)}
-  function warmNextPage(){const assets=NEXT_PAGE_ASSETS[state.index]||[];const run=()=>assets.forEach(([kind,src],index)=>setTimeout(()=>prefetchAsset(kind,src),kind==='video'?1200:index*120));const schedule=()=>{const hero=panel.querySelector('.hero-media img');const afterHero=()=>setTimeout(()=>window.requestIdleCallback?window.requestIdleCallback(run,{timeout:1800}):run(),900);if(hero&&!hero.complete)hero.addEventListener('load',afterHero,{once:true});else afterHero()};if(document.readyState==='complete')schedule();else window.addEventListener('load',schedule,{once:true})}
+   function prefetchAsset(kind,src){if(!src||warmedAssets.has(src)||!connectionAllowsPrefetch(kind))return;warmedAssets.add(src);if(kind==='video'){fetch(src,{cache:'force-cache',credentials:'same-origin'}).then(response=>response.ok?response.arrayBuffer():null).catch(()=>{});return}const link=document.createElement('link');link.rel='prefetch';link.href=src;link.fetchPriority='low';link.as='image';link.dataset.greenWarmup=kind;document.head.appendChild(link)}
+   function warmNextPage(){const assets=NEXT_PAGE_ASSETS[state.index]||[];const run=()=>assets.forEach(([kind,src],index)=>setTimeout(()=>prefetchAsset(kind,src),kind==='video'?0:index*120));const schedule=()=>{const hero=panel.querySelector('.hero-media img');const afterHero=()=>setTimeout(run,hero?900:0);if(hero&&!hero.complete)hero.addEventListener('load',afterHero,{once:true});else afterHero()};if(document.readyState==='complete')schedule();else window.addEventListener('load',schedule,{once:true})}
   const COUNTRY_CARDS={
     survival:{era:'1980年代',image:'A',title:'沙区里的日常生活',fact:'井背塘当时没有公路和电。土房会被风沙堵门，树苗靠人背，水靠扁担和水桶运。',connection:'这解释了殷玉珍最初面对的困难，也说明治沙从日常生存开始。',terms:[{word:'扁担',pinyin:'biǎndan',meaning:'挑东西用的长木棍',english:'shoulder pole'},{word:'堵门',pinyin:'dǔmén',meaning:'把门口挡住',english:'block the door'}]},
     project:{era:'1978—2050',image:'D',title:'“三北”防护林工程',fact:'“三北”指东北、华北和西北。中国从1978年起在这些地区持续开展防风固沙、植被保护和生态建设。',connection:'殷玉珍的个人行动发生在中国北方长期生态治理的进程中。',terms:[{word:'防风固沙',pinyin:'fángfēng gùshā',meaning:'减少风和沙造成的破坏',english:'control wind and sand'},{word:'植被',pinyin:'zhíbèi',meaning:'一个地区的植物总称',english:'vegetation'},{word:'生态建设',pinyin:'shēngtài jiànshè',meaning:'改善环境、保护自然的长期工作',english:'ecological development'}]},
@@ -435,7 +435,7 @@
       <div class="task-checklist" aria-label="本页完成条件"><div class="task-check ${state.contextFilmPlayed?'done':''}"><i>${state.contextFilmPlayed?'✓':'1'}</i><b>看完三段视频</b><span>${watched.length}/3 已看；顺序由你决定</span></div><div class="task-check ${cardsReady?'done':''}"><i>${cardsReady?'✓':'2'}</i><b>翻开国情卡</b><span>${Math.min(state.countryOpened.length,2)}/2 已翻开</span></div><div class="task-check ${state.omissions.length>=2?'done':''}"><i>${state.omissions.length>=2?'✓':'3'}</i><b>选择还需要补充的信息</b><span>${Math.min(state.omissions.length,2)}/2 已选择</span></div><div class="task-check ${voiceCheck.pass?'done':''}"><i>${voiceCheck.pass?'✓':'4'}</i><b>完成修改说明</b><span>${voiceCheck.pass?'已达到要求':voiceCheck.msg}</span></div></div>
       <div class="row"><button class="primary" id="reviseBtn">检查四项并生成叙事线</button></div>${state.editorDraft?`${editorDraftTable(state.editorDraft)}<button class="primary" id="reframeNext" style="margin-top:16px">下一步：准备讲述 →</button>`:''}`;
     mountCountryGlossaries();
-    panel.querySelectorAll('[data-film-index]').forEach(button=>button.onclick=()=>{state.contextFilmScene=Number(button.dataset.filmIndex);persist();render();setTimeout(()=>{const selectedVideo=document.getElementById('contextVideo');activateVideo(selectedVideo);selectedVideo?.play().catch(()=>{})},80)});
+    panel.querySelectorAll('[data-film-index]').forEach(button=>{const warmChoice=()=>prefetchAsset('video',CONTEXT_FILM[Number(button.dataset.filmIndex)]?.video);button.addEventListener('pointerenter',warmChoice,{once:true});button.addEventListener('focus',warmChoice,{once:true});button.addEventListener('touchstart',warmChoice,{once:true,passive:true});button.onclick=()=>{state.contextFilmScene=Number(button.dataset.filmIndex);persist();render();setTimeout(()=>{const selectedVideo=document.getElementById('contextVideo');activateVideo(selectedVideo);selectedVideo?.play().catch(()=>{})},80)}});
     const video=document.getElementById('contextVideo'),captionButton=document.getElementById('captionToggle'),loading=document.getElementById('videoLoading');
     const narrationRate=1;
     video.defaultPlaybackRate=narrationRate;video.playbackRate=narrationRate;video.preservesPitch=true;
