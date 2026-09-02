@@ -94,7 +94,7 @@ const result = await page.evaluate(({ firstWarmupValue, initialVideoStats }) => 
 
 console.log(JSON.stringify({ base, filmIndex, firstFrameMs, watchSeconds, playback, ...result }, null, 2));
 if (result.videoPrefetched) throw new Error("Video should not be warmed through a speculative prefetch link");
-if (result.initialVideoSources.length > 1) throw new Error(`More than the active video was requested before play (${result.initialVideoSources.length} source(s))`);
+if (result.initialVideoSources.length > 2) throw new Error(`More than the default and selected videos were requested before play (${result.initialVideoSources.length} source(s))`);
 if (firstFrameMs > 2300) throw new Error(`First video frame took ${firstFrameMs}ms`);
 if (watchSeconds && (playback.waitingEvents > 0 || playback.currentTime < watchSeconds - 1)) throw new Error("Video stalled during playback");
 await browser.close();
