@@ -113,7 +113,7 @@ for (const [name, source] of [["culture", culture], ["culture login", cultureLog
   }
 }
 
-for (const item of ['"/forest.html"', 'NextResponse.rewrite', 'matcher: ["/"]']) {
+for (const item of ['"/forest.html"', 'NextResponse.rewrite', 'matcher: ["/", "/teacher-feedback.html"]']) {
   if (!middleware.includes(item)) {
     console.error(`Missing culture host routing: ${item}`);
     process.exit(1);
