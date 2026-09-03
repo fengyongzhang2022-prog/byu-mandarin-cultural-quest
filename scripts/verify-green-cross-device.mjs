@@ -111,6 +111,36 @@ async function verifyTeacherSurvey() {
   await context.close();
 }
 
+async function verifyStandaloneSurvey(label, options) {
+  const context = await browser.newContext(options);
+  const page = await context.newPage();
+  let payload = null;
+  await page.route("**/api/teacher-feedback", async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    payload = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "test-feedback" }) });
+  });
+  await page.goto(`${base}/forest-feedback.html`, { waitUntil: "domcontentloaded" });
+  if (!await page.locator('a[href="/forest.html?teacher=1"]').isVisible()) throw new Error(`${label}: full teacher trial link is missing`);
+  await page.fill("#participantAlias", "Teacher Test");
+  await page.click('[data-year="3–5年"]');
+  await page.check("#taughtInUs");
+  await page.click("#continueButton");
+  if (!await page.locator("#surveyPanel").isVisible()) throw new Error(`${label}: survey step did not open`);
+  if (await page.locator("[data-key]").count() !== 25) throw new Error(`${label}: standalone ratings are incomplete`);
+  for (const key of ["gaiValue", "storyUnderstanding", "safeExpression", "storytelling", "adoption"]) {
+    await page.click(`[data-key="${key}"][data-value="4"]`);
+  }
+  await page.fill("#valueComment", "时间线和国情卡片有助于理解。 ");
+  await page.fill("#revisionComment", "继续改善移动端录音体验。 ");
+  await page.click("#submitButton");
+  await page.waitForSelector("#successPanel.active");
+  if (!payload || payload.participantAlias !== "Teacher Test" || payload.teachingYears !== "3–5年") throw new Error(`${label}: profile data was not submitted`);
+  if (payload.cohort !== "teacher-pilot-standalone" || Object.keys(payload.ratings || {}).length !== 5) throw new Error(`${label}: feedback payload is incomplete`);
+  if (await page.evaluate(() => localStorage.getItem("green_teacher_feedback_draft_v1")) !== null) throw new Error(`${label}: submitted draft was not cleared`);
+  await context.close();
+}
+
 const iphoneWechat = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const ipadWechat = "Mozilla/5.0 (iPad; CPU OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const huaweiWechat = "Mozilla/5.0 (Linux; Android 14; HUAWEI Pura 70 Pro) AppleWebKit/537.36 Chrome/122.0 Mobile Safari/537.36 MicroMessenger/8.0.50";
@@ -127,6 +157,8 @@ await verifyRecorder("desktop Chrome", desktopChrome, "webm", false);
 await verifyListening(iphoneWechat);
 await verifyListening(huaweiWechat);
 await verifyTeacherSurvey();
+await verifyStandaloneSurvey("desktop", { viewport: { width: 1440, height: 1000 }, userAgent: desktopChrome });
+await verifyStandaloneSurvey("iPhone WeChat", { viewport: { width: 390, height: 844 }, userAgent: iphoneWechat });
 
 await browser.close();
-console.log("Cross-device hint, recording, and listening checks passed.");
+console.log("Cross-device hints, recording, listening, and both teacher-feedback paths passed.");
