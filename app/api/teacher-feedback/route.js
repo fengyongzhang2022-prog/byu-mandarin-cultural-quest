@@ -91,7 +91,13 @@ async function readCosJson(storage, Key) {
 function publicRecord(record) {
   const voiceParts = ["value", "revision"].flatMap((part) => {
     const item = record?.voice?.[part];
-    return item?.key ? [{ part, seconds: Math.max(0, Number(item.seconds) || 0) }] : [];
+    const segments = Array.isArray(item?.segments) ? item.segments : item?.key ? [item] : [];
+    return segments.filter((segment) => segment?.key).map((segment, index) => ({
+      part,
+      segment: index,
+      segmentCount: segments.length,
+      seconds: Math.max(0, Number(segment.seconds) || 0),
+    }));
   });
   return {
     id: cleanText(record?.id, 80),
@@ -118,18 +124,20 @@ async function readDirectFeedback() {
   return records;
 }
 
-async function readDirectAudio(audioId, part) {
+async function readDirectAudio(audioId, part, segmentIndex = 0) {
   if (!/^[0-9a-f-]{36}$/i.test(audioId) || !new Set(["value", "revision"]).has(part)) return null;
   const storage = await resolveStorage();
   const key = (await listFeedbackKeys(storage)).find((item) => item.endsWith(`/${audioId}.json`));
   if (!key) return null;
   const record = await readCosJson(storage, key);
   const voice = record?.voice?.[part];
-  const voiceKey = String(voice?.key || "");
+  const segments = Array.isArray(voice?.segments) ? voice.segments : voice?.key ? [voice] : [];
+  const selected = segments[Math.max(0, Number(segmentIndex) || 0)];
+  const voiceKey = String(selected?.key || "");
   const expectedPrefix = key.slice(0, -5);
-  if (!voiceKey.startsWith(`${expectedPrefix}-${part}.`) || !voiceKey.startsWith("private/teacher-feedback/")) return null;
+  if (!voiceKey.startsWith(`${expectedPrefix}-${part}`) || !voiceKey.startsWith("private/teacher-feedback/")) return null;
   const object = await cosCall(storage.client, "getObject", { Bucket: storage.Bucket, Region: storage.Region, Key: voiceKey });
-  return { body: object.Body, mime: cleanText(voice?.mime, 80) || object?.headers?.["content-type"] || "audio/webm" };
+  return { body: object.Body, mime: cleanText(selected?.mime, 80) || object?.headers?.["content-type"] || "audio/webm" };
 }
 
 function validateSubmission(body) {
@@ -145,8 +153,9 @@ function validateSubmission(body) {
   const voice = rawVoice && (rawVoice.value || rawVoice.revision || rawVoice.data) ? rawVoice : null;
   const voiceValue = voice?.value || (voice?.data ? voice : null);
   const voiceRevision = voice?.revision || null;
-  if (!comments.value && !voiceValue) throw new Error("请以文字或语音回答第 6 题。");
-  if (!comments.revision && !voiceRevision && !voice?.data) throw new Error("请以文字或语音回答第 7 题。");
+  const hasAudioData = (item) => Boolean(item?.data || (Array.isArray(item?.segments) && item.segments.some((segment) => segment?.data)));
+  if (!comments.value && !hasAudioData(voiceValue)) throw new Error("请以文字或语音回答第 6 题。");
+  if (!comments.revision && !hasAudioData(voiceRevision) && !voice?.data) throw new Error("请以文字或语音回答第 7 题。");
   const participantAlias = cleanText(body?.participantAlias || body?.comments?.participantAlias, 40);
   if (!participantAlias) throw new Error("参与者代称不能为空。");
   return { participantAlias, ratings, comments, voice, cohort: cleanText(body?.cohort, 40) || "teacher-pilot", sourceVersion: cleanText(body?.sourceVersion, 80) };
@@ -158,20 +167,24 @@ async function saveDirectlyToCos(body) {
   const id = crypto.randomUUID();
   const month = new Date().toISOString().slice(0, 7);
   const prefix = `private/teacher-feedback/${month}/${id}`;
-  let voiceKeys = {};
+  const voiceKeys = [];
   try {
-    const audioEntries = [
-      submission.voice?.value?.data ? ["value", submission.voice.value] : submission.voice?.data ? ["value", submission.voice] : null,
-      submission.voice?.revision?.data ? ["revision", submission.voice.revision] : null,
-    ].filter(Boolean);
-    for (const [voicePart, voiceData] of audioEntries) {
+    const audioEntries = ["value", "revision"].flatMap((voicePart) => {
+      const raw = submission.voice?.[voicePart] || (voicePart === "value" && submission.voice?.data ? submission.voice : null);
+      const segments = Array.isArray(raw?.segments) ? raw.segments : raw?.data ? [raw] : [];
+      return segments.filter((segment) => segment?.data).map((voiceData, index) => ({ voicePart, voiceData, index, count: segments.length }));
+    });
+    const savedVoice = {};
+    for (const { voicePart, voiceData, index, count } of audioEntries) {
       const audio = Buffer.from(String(voiceData.data), "base64");
       if (!audio.length || audio.length > MAX_AUDIO_BYTES) throw new Error("语音文件超过上传上限，请缩短后重试。");
       const mime = cleanText(voiceData.mime, 80) || "audio/webm";
       const extension = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-      const key = `${prefix}-${voicePart}.${extension}`;
-      voiceKeys[voicePart] = key;
+      const key = `${prefix}-${voicePart}${count > 1 ? `-${index + 1}` : ""}.${extension}`;
+      voiceKeys.push(key);
       await cosCall(client, "putObject", { Bucket, Region, Key: key, Body: audio, ContentType: mime });
+      if (!savedVoice[voicePart]) savedVoice[voicePart] = [];
+      savedVoice[voicePart].push({ key, mime, seconds: Math.max(0, Number(voiceData.seconds) || 0) });
     }
     const record = {
       id,
@@ -180,7 +193,10 @@ async function saveDirectlyToCos(body) {
       teachingYears: body.teachingYears,
       ratings: submission.ratings,
       comments: submission.comments,
-      voice: Object.keys(voiceKeys).length ? Object.fromEntries(Object.entries(voiceKeys).map(([part,key]) => [part, { key, mime: cleanText(submission.voice?.[part]?.mime, 80) || "audio/webm", seconds: Number(submission.voice?.[part]?.seconds) || 0 }])) : null,
+      voice: Object.keys(savedVoice).length ? Object.fromEntries(Object.entries(savedVoice).map(([part, segments]) => [part, {
+        seconds: segments.reduce((sum, segment) => sum + segment.seconds, 0),
+        segments,
+      }])) : null,
       cohort: submission.cohort,
       sourceVersion: submission.sourceVersion,
       submittedAt: new Date().toISOString(),
@@ -190,12 +206,12 @@ async function saveDirectlyToCos(body) {
     await cosCall(client, "putObject", { Bucket, Region, Key: recordKey, Body: Buffer.from(JSON.stringify(record)), ContentType: "application/json; charset=utf-8" });
     if (submission.sourceVersion === "codex-service-smoke-test") {
       await cosCall(client, "deleteObject", { Bucket, Region, Key: recordKey });
-      for (const key of Object.values(voiceKeys)) await cosCall(client, "deleteObject", { Bucket, Region, Key: key }).catch(() => {});
+      for (const key of voiceKeys) await cosCall(client, "deleteObject", { Bucket, Region, Key: key }).catch(() => {});
       return { ok: true, id, smoke: true };
     }
     return { ok: true, id };
   } catch (error) {
-    for (const key of Object.values(voiceKeys || {})) await cosCall(client, "deleteObject", { Bucket, Region, Key: key }).catch(() => {});
+    for (const key of voiceKeys) await cosCall(client, "deleteObject", { Bucket, Region, Key: key }).catch(() => {});
     throw error;
   }
 }
@@ -223,7 +239,8 @@ export async function GET(request) {
   const url = new URL(request.url);
   const audioId = url.searchParams.get("audio");
   const audioPart = url.searchParams.get("part") === "revision" ? "revision" : "value";
-  const endpoint = apiUrl(audioId ? `/green/teacher-feedback/${encodeURIComponent(audioId)}/audio` : "/green/teacher-feedback");
+  const audioSegment = Math.max(0, Number(url.searchParams.get("segment")) || 0);
+  const endpoint = apiUrl(audioId ? `/green/teacher-feedback/${encodeURIComponent(audioId)}/audio?part=${audioPart}&segment=${audioSegment}` : "/green/teacher-feedback");
   try {
     if (endpoint && process.env.GREEN_PROXY_SECRET && process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY) {
       const upstream = await fetch(endpoint, { headers: proxyHeaders({ "x-green-feedback-admin": process.env.GREEN_TEACHER_FEEDBACK_ADMIN_KEY }), cache: "no-store" });
@@ -234,7 +251,7 @@ export async function GET(request) {
       return Response.json(await upstream.json().catch(() => ({})), { status: upstream.status, headers: { "Cache-Control": "private, no-store" } });
     }
     if (audioId) {
-      const audio = await readDirectAudio(audioId, audioPart);
+      const audio = await readDirectAudio(audioId, audioPart, audioSegment);
       if (!audio) return Response.json({ error: "没有找到这段语音反馈。" }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
       return new Response(audio.body, { status: 200, headers: { "Content-Type": audio.mime, "Cache-Control": "private, no-store", "Content-Disposition": "inline" } });
     }

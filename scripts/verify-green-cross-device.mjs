@@ -145,11 +145,14 @@ async function verifyStandaloneSurvey(label, options) {
 async function verifySurveyVoice(label, userAgent, expectedMime) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent });
   await context.addInitScript(() => {
-    const stream = { getTracks: () => [{ stop() {} }] };
-    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async constraints => { window.__surveyGum = constraints; return stream; } } });
+    const track = new EventTarget();
+    track.readyState = "live";
+    track.stop = () => { track.readyState = "ended"; };
+    const makeStream = () => ({ getTracks: () => [track], getAudioTracks: () => [track] });
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async constraints => { window.__surveyGum = constraints; track.readyState = "live"; return makeStream(); } } });
     class MockRecorder {
       static isTypeSupported(type) { return type.includes("mp4") || type.includes("webm"); }
-      constructor(source, options) { this.state = "inactive"; this.mimeType = options?.mimeType || "audio/webm"; window.__surveyRecorderOptions = options || null; }
+      constructor(source, options) { this.state = "inactive"; this.mimeType = options?.mimeType || "audio/webm"; window.__surveyRecorderOptions = options || null; window.__surveyRecorder = this; }
       start() { this.state = "recording"; }
       requestData() {}
       stop() { this.state = "inactive"; this.ondataavailable?.({ data: new Blob(["survey audio"], { type: this.mimeType }) }); this.onstop?.(); }
@@ -168,18 +171,27 @@ async function verifySurveyVoice(label, userAgent, expectedMime) {
   await page.click('[data-year="6–10年"]');
   await page.check("#taughtInUs");
   await page.click("#continueButton");
+  if (!await page.locator("text=最长8分钟").count()) throw new Error(`${label}: standalone survey does not show the 8-minute limit`);
   for (const key of ["gaiValue", "storyUnderstanding", "safeExpression", "storytelling", "adoption"]) await page.click(`[data-key="${key}"][data-value="5"]`);
   for (const part of ["value", "revision"]) {
-    await page.click(`#${part}VoiceButton`);
-    const config = await page.evaluate(() => ({ constraints: window.__surveyGum, options: window.__surveyRecorderOptions }));
-    if (config.constraints?.audio !== true) throw new Error(`${label}: standalone voice did not use simple mobile constraints`);
-    if (!String(config.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: standalone voice chose ${config.options?.mimeType}`);
-    await page.click(`#${part}VoiceButton`);
-    await page.waitForFunction(partName => document.getElementById(`${partName}VoiceStatus`).textContent.includes("录音已保存"), part);
+    const repetitions = part === "value" ? 2 : 1;
+    for (let attempt = 0; attempt < repetitions; attempt += 1) {
+      await page.click(`#${part}VoiceButton`);
+      const config = await page.evaluate(() => ({ constraints: window.__surveyGum, options: window.__surveyRecorderOptions }));
+      if (config.constraints?.audio !== true) throw new Error(`${label}: standalone voice did not use simple mobile constraints`);
+      if (!String(config.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: standalone voice chose ${config.options?.mimeType}`);
+      if (part === "value" && attempt === 0) {
+        await page.evaluate(() => window.__surveyRecorder.stop());
+        await page.waitForFunction(partName => document.getElementById(`${partName}VoiceStatus`).textContent.includes("浏览器中断"), part);
+      } else {
+        await page.click(`#${part}VoiceButton`);
+      }
+      await page.waitForFunction(([partName,count]) => document.getElementById(`${partName}VoiceStatus`).textContent.includes(`已保存 ${count} 段`), [part, attempt + 1]);
+    }
   }
   await page.click("#submitButton");
   await page.waitForSelector("#successPanel.active");
-  if (!standalonePayload?.voice?.value?.data || !standalonePayload?.voice?.revision?.data) throw new Error(`${label}: standalone audio was not submitted`);
+  if (standalonePayload?.voice?.value?.segments?.length !== 2 || standalonePayload?.voice?.revision?.segments?.length !== 1) throw new Error(`${label}: segmented standalone audio was not submitted`);
 
   await page.goto(`${base}/forest.html?preview=1&stage=2`, { waitUntil: "domcontentloaded" });
   await page.locator("[data-chapter-predict]").first().click();
@@ -196,7 +208,17 @@ async function verifySurveyVoice(label, userAgent, expectedMime) {
   if (embeddedConfig.constraints?.audio !== true) throw new Error(`${label}: embedded survey did not use simple mobile constraints`);
   if (!String(embeddedConfig.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: embedded survey chose ${embeddedConfig.options?.mimeType}`);
   await page.click("#teacherVoiceButton");
-  await page.waitForFunction(() => document.getElementById("teacherVoiceStatus").textContent.includes("录音已保存"));
+  await page.waitForFunction(() => document.getElementById("teacherVoiceStatus").textContent.includes("已保存 1 段"));
+  await context.close();
+}
+
+async function verifyBackNavigation() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto(`${base}/forest.html?preview=1&stage=8`, { waitUntil: "domcontentloaded" });
+  await page.click("#stageBack");
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem("green_story_state")).index === 7);
+  if (!await page.locator("text=把治沙故事讲给一个具体听众").count()) throw new Error("Page 10 top back button did not return to the speaking task");
   await context.close();
 }
 
@@ -220,6 +242,7 @@ await verifyStandaloneSurvey("desktop", { viewport: { width: 1440, height: 1000 
 await verifyStandaloneSurvey("iPhone WeChat", { viewport: { width: 390, height: 844 }, userAgent: iphoneWechat });
 await verifySurveyVoice("iPhone WeChat", iphoneWechat, "mp4");
 await verifySurveyVoice("Huawei WeChat", huaweiWechat, "webm");
+await verifyBackNavigation();
 
 await browser.close();
 console.log("Cross-device hints, recording, listening, and both teacher-feedback paths passed.");
