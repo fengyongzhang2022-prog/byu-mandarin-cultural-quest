@@ -190,6 +190,7 @@ async function saveDirectlyToCos(body) {
     await cosCall(client, "putObject", { Bucket, Region, Key: recordKey, Body: Buffer.from(JSON.stringify(record)), ContentType: "application/json; charset=utf-8" });
     if (submission.sourceVersion === "codex-service-smoke-test") {
       await cosCall(client, "deleteObject", { Bucket, Region, Key: recordKey });
+      for (const key of Object.values(voiceKeys)) await cosCall(client, "deleteObject", { Bucket, Region, Key: key }).catch(() => {});
       return { ok: true, id, smoke: true };
     }
     return { ok: true, id };

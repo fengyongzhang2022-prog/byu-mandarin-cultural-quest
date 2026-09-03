@@ -105,7 +105,8 @@ async function verifyTeacherSurvey() {
   await page.reload({ waitUntil: "domcontentloaded" });
   const finish = page.locator("#finishTeacherSurvey");
   if (!await finish.isEnabled()) throw new Error("Teacher survey is still gated behind the optional AI example");
-  await finish.click();
+  if (!await page.locator(".teacher-survey-reminder").isVisible()) throw new Error("Persistent teacher survey reminder is missing");
+  await page.click("#openTeacherSurveyReminder");
   await page.waitForSelector('.survey-modal[role="dialog"]');
   if (await page.locator("[data-rating]").count() !== 25) throw new Error("Teacher survey rating choices are incomplete");
   await context.close();
@@ -141,6 +142,64 @@ async function verifyStandaloneSurvey(label, options) {
   await context.close();
 }
 
+async function verifySurveyVoice(label, userAgent, expectedMime) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent });
+  await context.addInitScript(() => {
+    const stream = { getTracks: () => [{ stop() {} }] };
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async constraints => { window.__surveyGum = constraints; return stream; } } });
+    class MockRecorder {
+      static isTypeSupported(type) { return type.includes("mp4") || type.includes("webm"); }
+      constructor(source, options) { this.state = "inactive"; this.mimeType = options?.mimeType || "audio/webm"; window.__surveyRecorderOptions = options || null; }
+      start() { this.state = "recording"; }
+      requestData() {}
+      stop() { this.state = "inactive"; this.ondataavailable?.({ data: new Blob(["survey audio"], { type: this.mimeType }) }); this.onstop?.(); }
+    }
+    Object.defineProperty(window, "MediaRecorder", { configurable: true, value: MockRecorder });
+  });
+  const page = await context.newPage();
+  let standalonePayload = null;
+  await page.route("**/api/teacher-feedback", async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    standalonePayload = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.goto(`${base}/forest-feedback.html`, { waitUntil: "domcontentloaded" });
+  await page.fill("#participantAlias", "Voice Teacher");
+  await page.click('[data-year="6–10年"]');
+  await page.check("#taughtInUs");
+  await page.click("#continueButton");
+  for (const key of ["gaiValue", "storyUnderstanding", "safeExpression", "storytelling", "adoption"]) await page.click(`[data-key="${key}"][data-value="5"]`);
+  for (const part of ["value", "revision"]) {
+    await page.click(`#${part}VoiceButton`);
+    const config = await page.evaluate(() => ({ constraints: window.__surveyGum, options: window.__surveyRecorderOptions }));
+    if (config.constraints?.audio !== true) throw new Error(`${label}: standalone voice did not use simple mobile constraints`);
+    if (!String(config.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: standalone voice chose ${config.options?.mimeType}`);
+    await page.click(`#${part}VoiceButton`);
+    await page.waitForFunction(partName => document.getElementById(`${partName}VoiceStatus`).textContent.includes("录音已保存"), part);
+  }
+  await page.click("#submitButton");
+  await page.waitForSelector("#successPanel.active");
+  if (!standalonePayload?.voice?.value?.data || !standalonePayload?.voice?.revision?.data) throw new Error(`${label}: standalone audio was not submitted`);
+
+  await page.goto(`${base}/forest.html?preview=1&stage=2`, { waitUntil: "domcontentloaded" });
+  await page.locator("[data-chapter-predict]").first().click();
+  await page.goto(`${base}/forest.html?preview=1&stage=8`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("green_story_state"));
+    state.teacherReview = { taughtInUs: "yes", years: "6–10年", startedAt: new Date().toISOString() };
+    localStorage.setItem("green_story_state", JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.click("#finishTeacherSurvey");
+  await page.click("#teacherVoiceButton");
+  const embeddedConfig = await page.evaluate(() => ({ constraints: window.__surveyGum, options: window.__surveyRecorderOptions }));
+  if (embeddedConfig.constraints?.audio !== true) throw new Error(`${label}: embedded survey did not use simple mobile constraints`);
+  if (!String(embeddedConfig.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: embedded survey chose ${embeddedConfig.options?.mimeType}`);
+  await page.click("#teacherVoiceButton");
+  await page.waitForFunction(() => document.getElementById("teacherVoiceStatus").textContent.includes("录音已保存"));
+  await context.close();
+}
+
 const iphoneWechat = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const ipadWechat = "Mozilla/5.0 (iPad; CPU OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const huaweiWechat = "Mozilla/5.0 (Linux; Android 14; HUAWEI Pura 70 Pro) AppleWebKit/537.36 Chrome/122.0 Mobile Safari/537.36 MicroMessenger/8.0.50";
@@ -159,6 +218,8 @@ await verifyListening(huaweiWechat);
 await verifyTeacherSurvey();
 await verifyStandaloneSurvey("desktop", { viewport: { width: 1440, height: 1000 }, userAgent: desktopChrome });
 await verifyStandaloneSurvey("iPhone WeChat", { viewport: { width: 390, height: 844 }, userAgent: iphoneWechat });
+await verifySurveyVoice("iPhone WeChat", iphoneWechat, "mp4");
+await verifySurveyVoice("Huawei WeChat", huaweiWechat, "webm");
 
 await browser.close();
 console.log("Cross-device hints, recording, listening, and both teacher-feedback paths passed.");
