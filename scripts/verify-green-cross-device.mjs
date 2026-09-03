@@ -90,6 +90,27 @@ async function verifyListening(userAgent) {
   await context.close();
 }
 
+async function verifyTeacherSurvey() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto(`${base}/forest.html?preview=1&stage=2`, { waitUntil: "domcontentloaded" });
+  await page.locator("[data-chapter-predict]").first().click();
+  await page.goto(`${base}/forest.html?preview=1&stage=8`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("green_story_state"));
+    state.teacherReview = { taughtInUs: "yes", years: "3–5年", startedAt: new Date().toISOString() };
+    state.final.modelStory = "";
+    localStorage.setItem("green_story_state", JSON.stringify(state));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const finish = page.locator("#finishTeacherSurvey");
+  if (!await finish.isEnabled()) throw new Error("Teacher survey is still gated behind the optional AI example");
+  await finish.click();
+  await page.waitForSelector('.survey-modal[role="dialog"]');
+  if (await page.locator("[data-rating]").count() !== 25) throw new Error("Teacher survey rating choices are incomplete");
+  await context.close();
+}
+
 const iphoneWechat = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const ipadWechat = "Mozilla/5.0 (iPad; CPU OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
 const huaweiWechat = "Mozilla/5.0 (Linux; Android 14; HUAWEI Pura 70 Pro) AppleWebKit/537.36 Chrome/122.0 Mobile Safari/537.36 MicroMessenger/8.0.50";
@@ -105,6 +126,7 @@ await verifyRecorder("Huawei WeChat", huaweiWechat, "webm", true);
 await verifyRecorder("desktop Chrome", desktopChrome, "webm", false);
 await verifyListening(iphoneWechat);
 await verifyListening(huaweiWechat);
+await verifyTeacherSurvey();
 
 await browser.close();
 console.log("Cross-device hint, recording, and listening checks passed.");
