@@ -112,6 +112,26 @@ async function verifyTeacherSurvey() {
   await context.close();
 }
 
+async function verifyTeacherEntryAndPreviewCTA() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto(`${base}/forest.html?preview=1`, { waitUntil: "domcontentloaded" });
+  if (!await page.locator("#teacherStart").isEnabled()) throw new Error("Teacher start button is disabled before the form can explain missing fields");
+  await page.fill("#participantName", "Teacher Preview");
+  await page.click('[data-review-us="yes"]');
+  await page.click('[data-review-years="3–5年"]');
+  if (!await page.locator("#teacherStartStatus").getByText("信息已完整，可以开始。").count()) throw new Error("Teacher entry does not show a ready state");
+  await page.click("#teacherStart");
+  await page.waitForSelector(".teacher-notes-page");
+
+  await page.goto(`${base}/forest.html?preview=1&stage=8`, { waitUntil: "domcontentloaded" });
+  if (!await page.locator("#finishTeacherSurvey").isVisible()) throw new Error("Preview final page is missing the embedded teacher-survey CTA");
+  if (!await page.locator("#openTeacherSurveyReminder").isVisible()) throw new Error("Preview final page is missing the persistent teacher-survey reminder");
+  await page.click("#openTeacherSurveyReminder");
+  await page.waitForSelector('.survey-modal[role="dialog"]');
+  await context.close();
+}
+
 async function verifyStandaloneSurvey(label, options) {
   const context = await browser.newContext(options);
   const page = await context.newPage();
@@ -238,6 +258,7 @@ await verifyRecorder("desktop Chrome", desktopChrome, "webm", false);
 await verifyListening(iphoneWechat);
 await verifyListening(huaweiWechat);
 await verifyTeacherSurvey();
+await verifyTeacherEntryAndPreviewCTA();
 await verifyStandaloneSurvey("desktop", { viewport: { width: 1440, height: 1000 }, userAgent: desktopChrome });
 await verifyStandaloneSurvey("iPhone WeChat", { viewport: { width: 390, height: 844 }, userAgent: iphoneWechat });
 await verifySurveyVoice("iPhone WeChat", iphoneWechat, "mp4");
