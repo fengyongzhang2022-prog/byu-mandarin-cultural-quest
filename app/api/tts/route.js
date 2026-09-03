@@ -82,14 +82,7 @@ function clean(value, max = 220) {
   return String(value || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max);
 }
 
-export async function POST(request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
+async function respondWithSpeech(body) {
   const role = clean(body?.role, 20);
   const text = clean(body?.text);
   const requestedSpeed = Number(body?.speed);
@@ -133,5 +126,25 @@ export async function POST(request) {
       "Cache-Control": "private, max-age=86400",
       "X-Role-Voice": result.label,
     },
+  });
+}
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  return respondWithSpeech(body);
+}
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  return respondWithSpeech({
+    role: searchParams.get("role"),
+    text: searchParams.get("text"),
+    speed: searchParams.get("speed"),
+    timestamps: false,
   });
 }

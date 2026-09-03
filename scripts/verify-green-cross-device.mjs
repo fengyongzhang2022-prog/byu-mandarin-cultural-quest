@@ -1,0 +1,110 @@
+import { chromium } from "file:///C:/Users/ThinkPad/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs";
+
+const base = process.env.GREEN_BASE || "http://127.0.0.1:3100";
+const browser = await chromium.launch({ headless: true, channel: "chrome" });
+
+async function verifyHints(label, options) {
+  const context = await browser.newContext(options);
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  for (let stage = 1; stage <= 8; stage += 1) {
+    await page.goto(`${base}/forest.html?preview=1&stage=${stage}`, { waitUntil: "domcontentloaded" });
+    await page.click("#hintBtn");
+    await page.waitForSelector(".hint-modal");
+    await page.click(".hint-close-x");
+    if (await page.locator(".hint-modal").count()) throw new Error(`${label} stage ${stage}: close icon failed`);
+
+    await page.click("#hintBtn");
+    await page.click('[data-close-hints]:not(.hint-close-x)');
+    if (await page.locator(".hint-modal").count()) throw new Error(`${label} stage ${stage}: Continue failed`);
+
+    await page.click("#hintBtn");
+    await page.locator(".hint-modal").click({ position: { x: 3, y: 3 } });
+    if (await page.locator(".hint-modal").count()) throw new Error(`${label} stage ${stage}: backdrop failed`);
+
+    await page.click("#hintBtn");
+    await page.keyboard.press("Escape");
+    if (await page.locator(".hint-modal").count()) throw new Error(`${label} stage ${stage}: Escape failed`);
+  }
+  if (errors.length) throw new Error(`${label} page errors: ${errors.join(" | ")}`);
+  await context.close();
+}
+
+async function verifyRecorder(label, userAgent, expectedMime, simpleConstraints) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent });
+  await context.addInitScript(() => {
+    const track = new EventTarget();
+    track.readyState = "live";
+    track.stop = () => { track.readyState = "ended"; };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track], getVideoTracks: () => [] };
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: async constraints => { window.__gum = constraints; return stream; } } });
+    class MockRecorder {
+      static isTypeSupported(type) { return type.includes("mp4") || type.includes("webm"); }
+      constructor(source, options) { this.stream = source; this.state = "inactive"; this.mimeType = options?.mimeType || "audio/webm"; window.__recorderOptions = options || null; }
+      start(timeslice) { this.state = "recording"; window.__timeslice = timeslice; }
+      requestData() {}
+      stop() { this.state = "inactive"; this.ondataavailable?.({ data: new Blob(["audio"], { type: this.mimeType }) }); this.onstop?.(); }
+    }
+    Object.defineProperty(window, "MediaRecorder", { configurable: true, value: MockRecorder });
+    window.__recognitionStarts = 0;
+    class MockRecognition { start() { window.__recognitionStarts += 1; } stop() {} abort() {} }
+    Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: MockRecognition });
+  });
+  const page = await context.newPage();
+  await page.goto(`${base}/forest.html?preview=1&stage=1`, { waitUntil: "domcontentloaded" });
+  if (await page.locator("text=改用文字").count()) throw new Error(`${label}: text fallback is still present`);
+  await page.click("#seeMic");
+  await page.waitForSelector("#seeMic.live");
+  const result = await page.evaluate(() => ({ constraints: window.__gum, options: window.__recorderOptions, timeslice: window.__timeslice, recognitionStarts: window.__recognitionStarts }));
+  if (Boolean(result.constraints?.audio === true) !== simpleConstraints) throw new Error(`${label}: microphone constraints are not adapted`);
+  if (!String(result.options?.mimeType || "").includes(expectedMime)) throw new Error(`${label}: unexpected recording format ${result.options?.mimeType}`);
+  if (result.recognitionStarts !== 0) throw new Error(`${label}: speech recognition competed with recording`);
+  if (result.timeslice !== 1000) throw new Error(`${label}: recorder health chunks are disabled`);
+  await page.click("#seeMic");
+  await context.close();
+}
+
+async function verifyListening(userAgent) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent });
+  await context.addInitScript(() => {
+    window.__audioUrls = [];
+    class MockAudio {
+      constructor(url) { this.url = url; window.__audioUrls.push(url); }
+      setAttribute() {}
+      pause() {}
+      play() { setTimeout(() => this.onended?.(), 5); return Promise.resolve(); }
+    }
+    Object.defineProperty(window, "Audio", { configurable: true, value: MockAudio });
+  });
+  const page = await context.newPage();
+  for (const stage of [2, 3, 4]) {
+    await page.goto(`${base}/forest.html?preview=1&stage=${stage}`, { waitUntil: "domcontentloaded" });
+    await page.locator("[data-chapter-predict]").first().click();
+    await page.click("#playChapter");
+    await page.waitForFunction(() => window.__audioUrls.length > 0);
+    const urls = await page.evaluate(() => window.__audioUrls.splice(0));
+    if (!urls.every(url => url.startsWith("/api/tts?") && url.includes("role=narrator"))) throw new Error(`stage ${stage}: listening did not use direct Tencent audio URLs`);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("green_story_state")).chapters[Object.keys(JSON.parse(localStorage.getItem("green_story_state")).chapters)[location.search.match(/stage=(\d+)/)[1]-2]].played > 0).catch(() => {});
+  }
+  await context.close();
+}
+
+const iphoneWechat = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
+const ipadWechat = "Mozilla/5.0 (iPad; CPU OS 17_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.50";
+const huaweiWechat = "Mozilla/5.0 (Linux; Android 14; HUAWEI Pura 70 Pro) AppleWebKit/537.36 Chrome/122.0 Mobile Safari/537.36 MicroMessenger/8.0.50";
+const desktopChrome = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36";
+
+await verifyHints("desktop", { viewport: { width: 1440, height: 1000 }, userAgent: desktopChrome });
+await verifyHints("iPhone WeChat", { viewport: { width: 390, height: 844 }, userAgent: iphoneWechat });
+await verifyHints("iPad WeChat", { viewport: { width: 820, height: 1180 }, userAgent: ipadWechat });
+await verifyHints("Huawei WeChat", { viewport: { width: 412, height: 915 }, userAgent: huaweiWechat });
+await verifyRecorder("iPhone WeChat", iphoneWechat, "mp4", true);
+await verifyRecorder("iPad WeChat", ipadWechat, "mp4", true);
+await verifyRecorder("Huawei WeChat", huaweiWechat, "webm", true);
+await verifyRecorder("desktop Chrome", desktopChrome, "webm", false);
+await verifyListening(iphoneWechat);
+await verifyListening(huaweiWechat);
+
+await browser.close();
+console.log("Cross-device hint, recording, and listening checks passed.");
