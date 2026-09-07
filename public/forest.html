@@ -927,21 +927,20 @@
     if(document.getElementById('reframeNext'))document.getElementById('reframeNext').onclick=advance;
   }
 
+  function renderContextAnswerPage(){
+    const context=COUNTRY_CARDS[state.countryFocus];
+    panel.innerHTML=`<section class="headline-lab simple-answer-page"><p class="eyebrow">补充练习 · 可稍后完成<span class="instruction-en" lang="en">Practice · Complete later if needed</span></p><span class="level-chip">口头回答 · 最少 20 秒<span class="instruction-en" lang="en">Spoken response · At least 20 seconds</span></span><h2>回答同学的问题</h2><div class="question-card"><b>一位美国同学问：</b><p>“5000美元到底起了什么作用？”</p></div><p class="lead">用自己的话直接回答，再补充捐款以前或以后的一个事实。</p><p class="task-english" lang="en">Answer directly in your own words, then add one fact from before or after the donation.</p>${context?`<p class="small">可以用你刚才看到的背景信息：${context.gist}</p>`:''}<details class="extension-prompt"><summary>需要时，打开句式提示 / Sentence support</summary><p>“5000美元帮助……。不过，早在……。后来……。所以，这笔捐款……，但森林也……”</p><div class="transition-bank"><span>早在</span><span>后来</span><span>不过</span><span>所以</span></div></details>${voiceBox('correction','用自己的话回答<span class="instruction-en" lang="en">Answer in your own words</span>','至少20秒；先说明5000美元的作用，再补充一个时间点或长期变化。<span class="instruction-en" lang="en">At least 20 seconds. Explain what the US$5,000 did, then add one time point or long-term change.</span>')}<div class="row" style="margin-top:22px"><button class="primary" id="reframeNext">下一步：准备讲述 →</button><span class="small">这项练习可以稍后完成，不会影响浏览下一页。</span></div></section>`;
+    bindVoice('correction');document.getElementById('reframeNext').onclick=advance;
+  }
   function renderReframeV2(){
-    renderReframePageOne();
     const page=state.reframePage||1;
-    if(page===1){
+    if(page===2){renderContextAnswerPage();return}
+    renderReframePageOne();
       ['.headline-lab','.headline-card','.omissions','.correction-guide','.task-checklist','#reviseBtn','.editor-draft','#reframeNext'].forEach(selector=>document.querySelector(selector)?.remove());
       const heading=panel.querySelector('h2');if(heading)heading.innerHTML='<span>看完视频，</span><span>再翻开国情卡片</span><span class="instruction-en" lang="en">Watch the clips, then open the context cards</span>';const titleEnglish=panel.querySelector('.title-english');if(titleEnglish)titleEnglish.remove();
       const goalCheck=document.createElement('section');goalCheck.className='task-checklist';goalCheck.setAttribute('aria-label','学习目标02自查');goalCheck.innerHTML=`<div class="task-check ${state.contextFilmPlayed?'done':''}"><i>${state.contextFilmPlayed?'✓':'1'}</i><b>看完三段视频<span class="instruction-en" lang="en">Watch all three clips</span></b><span>${state.contextFilmsWatched.length}/3 已看</span></div><div class="task-check ${state.countryOpened.length>=2?'done':''}"><i>${state.countryOpened.length>=2?'✓':'2'}</i><b>阅读至少两张国情卡片<span class="instruction-en" lang="en">Read at least two context cards</span></b><span>${state.countryOpened.length}/2 已翻开</span></div><div class="task-check ${state.countryOpened.includes(state.countryFocus)?'done':''}"><i>${state.countryOpened.includes(state.countryFocus)?'✓':'3'}</i><b>选择一项有用的信息<span class="instruction-en" lang="en">Choose one useful context point</span></b><span>${state.countryOpened.includes(state.countryFocus)?'已经选好':'选择一项能帮助理解长期治沙的信息'}</span></div>`;goalCheck.insertAdjacentHTML('afterbegin','<p class="eyebrow">对照学习目标 02 自查<span class="instruction-en" lang="en">Check your work against Learning Goal 02</span></p>');panel.appendChild(goalCheck);
-      const next=document.createElement('button');next.className='primary';next.id='contextActivitiesNext';next.innerHTML='下一步：整理信息并回答问题<span class="instruction-en" lang="en">Next: organize the information and explain it</span> →';next.disabled=!(state.contextFilmPlayed&&state.countryOpened.length>=2&&state.countryOpened.includes(state.countryFocus));panel.appendChild(next);
+      const next=document.createElement('button');next.className='primary';next.id='contextActivitiesNext';next.innerHTML='下一步：回答同学的问题<span class="instruction-en" lang="en">Next: answer a classmate’s question</span> →';next.disabled=!(state.contextFilmPlayed&&state.countryOpened.length>=2&&state.countryOpened.includes(state.countryFocus));panel.appendChild(next);
       next.onclick=()=>{state.reframePage=2;persist();render()};
-    }else{
-      ['.reframe-header','.context-film','.film-source','.news-language-note','.country-section','.source-strip'].forEach(selector=>document.querySelector(selector)?.remove());
-      panel.querySelector(':scope > .eyebrow')?.remove();panel.querySelector(':scope > h2')?.remove();panel.querySelector('.reframe-intro')?.remove();panel.querySelector('.reframe-intro-en')?.remove();panel.querySelector('.title-english')?.remove();
-      const goalTwoHeading=[...panel.querySelectorAll('h3')].find(element=>element.textContent.includes('对照学习目标 03 自查'));if(goalTwoHeading)goalTwoHeading.innerHTML='对照学习目标 02 自查<span class="rubric-heading-en" lang="en">Check your work against Learning Goal 02</span>';
-      const back=document.createElement('button');back.className='quiet';back.id='contextVideosBack';back.textContent='← 回看视频与国情卡片';panel.insertBefore(back,panel.firstChild);back.onclick=()=>{state.reframePage=1;persist();render()};
-    }
   }
   function organizeTellIntro(){
     const children=[...panel.children],eyebrow=children.find(node=>node.classList?.contains('eyebrow')),chip=children.find(node=>node.classList?.contains('level-chip')),title=children.find(node=>node.tagName==='H2'),lead=children.find(node=>node.classList?.contains('lead')),english=children.find(node=>node.classList?.contains('task-english'));
