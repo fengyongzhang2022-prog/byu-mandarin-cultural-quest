@@ -141,7 +141,8 @@ const forestRequired = [
   "MicroMessenger",
   "recordingTechNote",
   "requestData",
-  "Listening comprehension · Replay as needed",
+  "听故事，回答1道主旨题、2道细节题",
+  "需要时展开讲述提示",
   "Check your work against Learning Goal 03",
   "Watch three clips and follow the complete story",
 ];
