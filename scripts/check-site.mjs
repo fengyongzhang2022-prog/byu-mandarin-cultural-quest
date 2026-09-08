@@ -120,13 +120,11 @@ const forestRequired = [
   "完成这节课后，我能……",
   "By the end of this lesson, I can…",
   "我能结合故事、视频、时间线和国情卡片",
-  "对照学习目标 02 自查",
-  "Check your work against Learning Goal 02",
   "对照学习目标 03 核对内容",
   "照片没有成功显示",
-  "按时间整理三项信息",
-  "5000美元到底起了什么作用",
-  "CAUSE_ROLES",
+  "视频展示",
+  "国情了解",
+  "整体理解",
   "先读这一句",
   "这条信息有什么用",
   "和视频一起理解",
@@ -137,7 +135,6 @@ const forestRequired = [
   "这两个人是谁？",
   "他们现在还在联系吗？",
   "图片中的土地后来变成森林了吗？",
-  "CAUSE_CRITERIA",
   "可点击“继续录音”",
   "FINAL_CRITERIA",
   "readMediaDuration",
@@ -146,7 +143,7 @@ const forestRequired = [
   "requestData",
   "Listening comprehension · Replay as needed",
   "Check your work against Learning Goal 03",
-  "Watch the clips, then open the context cards",
+  "Watch three clips and follow the complete story",
 ];
 const forestMissing = forestRequired.filter((item) => !forest.includes(item));
 if (forestMissing.length) {
